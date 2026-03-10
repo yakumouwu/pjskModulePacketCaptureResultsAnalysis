@@ -38,16 +38,16 @@ docker run -d \
   --log-opt max-size=20m \
   --log-opt max-file=5 \
   -p 3939:3939 \
-  -e PUBLIC_HOST=39.97.43.115 \
+  -e PUBLIC_HOST=<YOUR_SERVER_PUBLIC_IP_OR_DOMAIN> \
   -e RECEIVER_PORT=3939 \
   -e API_REGION=cn \
   -e OUTPUT_ROOT=/data \
   -e RETENTION_COUNT=25 \
   -e BOT_PUSH_ENABLED=1 \
   -e BOT_PUSH_URL=http://napcat:3000 \
-  -e BOT_TOKEN=<your-token> \
+  -e BOT_TOKEN=<YOUR_NAPCAT_HTTP_TOKEN> \
   -e BOT_PUSH_MODE=private \
-  -e BOT_TARGET_ID=1014242991 \
+  -e BOT_TARGET_ID=<YOUR_QQ_OR_GROUP_ID> \
   -e BOT_PUSH_RETRY=3 \
   -e ALERT_DEDUP_SECONDS=120 \
   -e ALERT_HIT_RETENTION=100 \
@@ -92,8 +92,11 @@ mod.setup_logging()
 mod.load_dedup_cache()
 mod.process_mysekai_alert(
     test_path,
-    "https://mkcn-prod-public-60001-1.dailygn.com/api/user/1014242991/mysekai?isForceAllReloadOnlyMysekai=True"
+    "https://mkcn-prod-public-60001-1.dailygn.com/api/user/<YOUR_USER_ID>/mysekai?isForceAllReloadOnlyMysekai=True"
 )
 print("triggered:", os.path.exists(test_path), test_path)
 PY
 ```
+
+Notes:
+- `BOT_TOKEN` is the NapCat HTTP server token (used as `Authorization: Bearer <token>`).

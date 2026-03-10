@@ -13,15 +13,16 @@ docker run -d \
   --log-opt max-size=20m \
   --log-opt max-file=5 \
   -p 3939:3939 \
-  -e PUBLIC_HOST=39.97.43.115 \
+  -e PUBLIC_HOST=<YOUR_SERVER_PUBLIC_IP_OR_DOMAIN> \
   -e RECEIVER_PORT=3939 \
   -e API_REGION=cn \
   -e OUTPUT_ROOT=/data \
   -e RETENTION_COUNT=25 \
   -e BOT_PUSH_ENABLED=1 \
   -e BOT_PUSH_URL=http://napcat:3000 \
+  -e BOT_TOKEN=<YOUR_NAPCAT_HTTP_TOKEN> \
   -e BOT_PUSH_MODE=private \
-  -e BOT_TARGET_ID=1014242991 \
+  -e BOT_TARGET_ID=<YOUR_QQ_OR_GROUP_ID> \
   -e BOT_PUSH_RETRY=3 \
   -e ALERT_DEDUP_SECONDS=120 \
   -e ALERT_HIT_RETENTION=100 \
@@ -38,6 +39,7 @@ docker run -d \
 - diamond hit archives: /data/alerts/hits/
 - diamond alert events: /data/alerts/diamond_events.jsonl
 - health check endpoint: GET /healthz
+- `BOT_TOKEN` is the NapCat HTTP server token (Authorization Bearer token)
 
 ## Host mapped path example
 
