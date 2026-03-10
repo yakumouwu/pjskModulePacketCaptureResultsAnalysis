@@ -30,9 +30,15 @@ docker build -t pjsk-receiver:dev3939 .
 Run (example):
 
 ```bash
+# Prerequisites:
+# 1) Receiver and NapCat must be in the same user-defined Docker network.
+# 2) Keep placeholders in docs; fill real IDs/tokens only in your own environment.
+# Create network if needed:
+# docker network create <YOUR_DOCKER_NETWORK>
+
 docker run -d \
   --name pjsk-receiver-dev \
-  --network langbot-network \
+  --network <YOUR_DOCKER_NETWORK> \
   --restart=always \
   --log-driver=json-file \
   --log-opt max-size=20m \
@@ -46,7 +52,7 @@ docker run -d \
   -e BOT_PUSH_ENABLED=1 \
   -e BOT_PUSH_URL=http://napcat:3000 \
   -e BOT_TOKEN=<YOUR_NAPCAT_HTTP_TOKEN> \
-  -e BOT_PUSH_MODE=private \
+  -e BOT_PUSH_MODE=<private_or_group> \
   -e BOT_TARGET_ID=<YOUR_QQ_OR_GROUP_ID> \
   -e BOT_PUSH_RETRY=3 \
   -e ALERT_DEDUP_SECONDS=120 \
@@ -62,6 +68,15 @@ Data output:
 - logs: `/data/logs/receiver.log`
 - alert hits: `/data/alerts/hits/`
 - alert events: `/data/alerts/diamond_events.jsonl`
+
+Quick checks after start:
+
+```bash
+docker logs -n 80 pjsk-receiver-dev
+docker exec -it pjsk-receiver-dev python -m pip show sssekai
+docker exec -it pjsk-receiver-dev python -m sssekai -h
+curl -sS http://127.0.0.1:3939/healthz
+```
 
 ## Virtual Diamond Alert Test
 
@@ -100,3 +115,4 @@ PY
 
 Notes:
 - `BOT_TOKEN` is the NapCat HTTP server token (used as `Authorization: Bearer <token>`).
+- If `BOT_PUSH_URL` uses a container name (for example `http://napcat:3000`), ensure both containers are attached to the same Docker network.
