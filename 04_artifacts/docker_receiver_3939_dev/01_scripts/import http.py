@@ -3,13 +3,13 @@ import json
 import logging
 import os
 import re
+import shutil
 import socketserver
 import subprocess
 import sys
 import time
-import shutil
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from itertools import count
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -27,18 +27,23 @@ LOG_DIR = os.path.join(OUTPUT_ROOT, "logs")
 RETENTION_COUNT = int(os.environ.get("RETENTION_COUNT", "25"))
 
 BOT_PUSH_ENABLED = os.environ.get("BOT_PUSH_ENABLED", "1") == "1"
-BOT_PUSH_URL = os.environ.get("BOT_PUSH_URL", os.environ.get("BOT_PUSH_BASE_URL", "http://napcat:3000")).rstrip("/")
+BOT_PUSH_URL = os.environ.get(
+    "BOT_PUSH_URL",
+    os.environ.get("BOT_PUSH_BASE_URL", "http://napcat:3000"),
+).rstrip("/")
 BOT_PUSH_MODE = os.environ.get("BOT_PUSH_MODE", "private").strip().lower()
 BOT_TARGET_ID = os.environ.get("BOT_TARGET_ID", "0").strip()
 ALERT_USER_LABEL = os.environ.get("ALERT_USER_LABEL", "player").strip()
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "").strip()
-ALERT_DEDUP_SECONDS = int(os.environ.get("ALERT_DEDUP_SECONDS", "120"))
 BOT_PUSH_RETRY = int(os.environ.get("BOT_PUSH_RETRY", "3"))
+
 ALERT_HIT_RETENTION = int(os.environ.get("ALERT_HIT_RETENTION", "100"))
 ALERT_EVENT_RETENTION_LINES = int(os.environ.get("ALERT_EVENT_RETENTION_LINES", "5000"))
+ALERT_WINDOW_CACHE_HOURS = int(os.environ.get("ALERT_WINDOW_CACHE_HOURS", "72"))
 
 REQUEST_COUNTER = count(1)
 ALERT_DEDUP_CACHE = {}
+
 SITE_LABELS = {
     5: "第一张图",
     7: "第二张图",
@@ -90,14 +95,14 @@ def setup_logging():
     root.setLevel(logging.INFO)
     root.handlers.clear()
     fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-    stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setFormatter(fmt)
-    file_handler = RotatingFileHandler(
-        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
-    )
-    file_handler.setFormatter(fmt)
-    root.addHandler(stream_handler)
-    root.addHandler(file_handler)
+
+    sh = logging.StreamHandler(sys.stdout)
+    sh.setFormatter(fmt)
+    fh = RotatingFileHandler(log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8")
+    fh.setFormatter(fmt)
+
+    root.addHandler(sh)
+    root.addHandler(fh)
 
 
 def ensure_alert_dirs():
@@ -116,7 +121,8 @@ def load_dedup_cache():
         with open(cache_file, "r", encoding="utf-8") as f:
             data = json.load(f)
         if isinstance(data, dict):
-            ALERT_DEDUP_CACHE.update({str(k): float(v) for k, v in data.items()})
+            for k, v in data.items():
+                ALERT_DEDUP_CACHE[str(k)] = float(v)
     except Exception as e:
         logger.warning("Load dedup cache failed: %s", e)
 
@@ -129,6 +135,16 @@ def save_dedup_cache():
             json.dump(ALERT_DEDUP_CACHE, f, ensure_ascii=False)
     except Exception as e:
         logger.warning("Save dedup cache failed: %s", e)
+
+
+def cleanup_window_dedup_cache():
+    now_ts = time.time()
+    max_age_seconds = max(1, ALERT_WINDOW_CACHE_HOURS) * 3600
+    expired = [k for k, ts in ALERT_DEDUP_CACHE.items() if now_ts - float(ts) > max_age_seconds]
+    for k in expired:
+        ALERT_DEDUP_CACHE.pop(k, None)
+    if expired:
+        save_dedup_cache()
 
 
 def append_alert_event(event):
@@ -195,6 +211,7 @@ def is_mysekai_full_packet(json_data):
 
 
 def find_diamond_hits(json_data):
+    # return {site_id: {"qty": int, "points": [{"qty":int, "seq":?, "x":?, "z":?}, ...]}}
     hits = {}
     for hm in json_data.get("updatedResources", {}).get("userMysekaiHarvestMaps", []):
         site_id = hm.get("mysekaiSiteId")
@@ -203,29 +220,75 @@ def find_diamond_hits(json_data):
                 qty = int(drop.get("quantity", 0))
                 entry = hits.setdefault(site_id, {"qty": 0, "points": []})
                 entry["qty"] += qty
-                point = {}
+                point = {"qty": qty}
                 if "seq" in drop:
                     point["seq"] = drop.get("seq")
                 if "positionX" in drop and "positionZ" in drop:
                     point["x"] = drop.get("positionX")
                     point["z"] = drop.get("positionZ")
-                if point:
-                    entry["points"].append(point)
+                entry["points"].append(point)
     return hits
 
 
-def should_send_alert(dedup_key):
-    now = time.time()
-    expired = [k for k, ts in ALERT_DEDUP_CACHE.items() if now - ts > ALERT_DEDUP_SECONDS]
-    for k in expired:
-        ALERT_DEDUP_CACHE.pop(k, None)
-    if expired:
+def get_refresh_window_id(now_dt):
+    # Refresh windows: 05:00 and 17:00 local time.
+    if now_dt.hour < 5:
+        prev = now_dt - timedelta(days=1)
+        return f"{prev.strftime('%Y%m%d')}_1700"
+    if now_dt.hour < 17:
+        return f"{now_dt.strftime('%Y%m%d')}_0500"
+    return f"{now_dt.strftime('%Y%m%d')}_1700"
+
+
+def point_signature(point):
+    seq = point.get("seq")
+    x = point.get("x")
+    z = point.get("z")
+    if seq is not None and x is not None and z is not None:
+        return f"seq:{seq}|x:{x}|z:{z}"
+    if seq is not None:
+        return f"seq:{seq}"
+    if x is not None and z is not None:
+        return f"x:{x}|z:{z}"
+    return "site_only"
+
+
+def filter_hits_for_current_window(user_id, hits):
+    # Keep only points not sent in current refresh window.
+    now_dt = datetime.now()
+    window_id = get_refresh_window_id(now_dt)
+    filtered = {}
+    changed = False
+
+    for sid, detail in sorted(hits.items()):
+        points = detail.get("points", [])
+        if not points:
+            key = f"{user_id}|{window_id}|site:{sid}|site_only"
+            if key in ALERT_DEDUP_CACHE:
+                continue
+            ALERT_DEDUP_CACHE[key] = time.time()
+            filtered[sid] = {"qty": detail.get("qty", 0), "points": []}
+            changed = True
+            continue
+
+        new_points = []
+        qty_sum = 0
+        for p in points:
+            sig = point_signature(p)
+            key = f"{user_id}|{window_id}|site:{sid}|{sig}"
+            if key in ALERT_DEDUP_CACHE:
+                continue
+            ALERT_DEDUP_CACHE[key] = time.time()
+            new_points.append(p)
+            qty_sum += int(p.get("qty", 0))
+            changed = True
+
+        if new_points:
+            filtered[sid] = {"qty": qty_sum, "points": new_points}
+
+    if changed:
         save_dedup_cache()
-    if dedup_key in ALERT_DEDUP_CACHE:
-        return False
-    ALERT_DEDUP_CACHE[dedup_key] = now
-    save_dedup_cache()
-    return True
+    return window_id, filtered
 
 
 def send_bot_message(message):
@@ -233,7 +296,7 @@ def send_bot_message(message):
         return False, "push_disabled"
     if not BOT_PUSH_URL:
         return False, "missing_bot_push_url"
-    if not BOT_TARGET_ID:
+    if not BOT_TARGET_ID or BOT_TARGET_ID == "0":
         return False, "missing_bot_target_id"
 
     if BOT_PUSH_MODE == "group":
@@ -265,6 +328,26 @@ def send_bot_message(message):
     return False, last_err
 
 
+def format_hit_text(hits):
+    parts = []
+    for sid, detail in sorted(hits.items()):
+        label = SITE_LABELS.get(sid, f"未知地图(siteId={sid})")
+        qty = detail.get("qty", 0)
+        points = detail.get("points", [])
+        if points:
+            point_text = []
+            for p in points[:6]:
+                if "x" in p and "z" in p:
+                    point_text.append(f"(x={p['x']},z={p['z']})")
+                elif "seq" in p:
+                    point_text.append(f"(seq={p['seq']})")
+            more = f"...(+{len(points)-6})" if len(points) > 6 else ""
+            parts.append(f"{label} 钻石{qty}，点位: {' '.join(point_text)}{more}")
+        else:
+            parts.append(f"{label} 钻石{qty}，点位: siteId={sid}")
+    return "；".join(parts)
+
+
 def process_mysekai_alert(out_json, original_url):
     try:
         with open(out_json, "r", encoding="utf-8") as f:
@@ -282,28 +365,20 @@ def process_mysekai_alert(out_json, original_url):
         logger.info("Alert skip: no diamond(id=12) found")
         return
 
+    cleanup_window_dedup_cache()
+
     user_match = re.search(r"/user/(\d+)", original_url)
     user_id = user_match.group(1) if user_match else "unknown"
-    hit_text_parts = []
-    for sid, detail in sorted(hits.items()):
-        label = SITE_LABELS.get(sid, f"未知地图(siteId={sid})")
-        qty = detail.get("qty", 0)
-        points = detail.get("points", [])
-        if points:
-            point_text = []
-            for p in points[:6]:
-                if "x" in p and "z" in p:
-                    point_text.append(f"(x={p['x']},z={p['z']})")
-                elif "seq" in p:
-                    point_text.append(f"(seq={p['seq']})")
-            more = f"...(+{len(points)-6})" if len(points) > 6 else ""
-            hit_text_parts.append(f"{label} 钻石{qty}，点位: {' '.join(point_text)}{more}")
-        else:
-            hit_text_parts.append(f"{label} 钻石{qty}，点位: siteId={sid}")
-    hit_text = "；".join(hit_text_parts)
-    dedup_key = f"{user_id}|{hit_text}"
+    window_id, hits = filter_hits_for_current_window(user_id, hits)
+    if not hits:
+        logger.info("Alert dedup skip: same diamond points in window %s", window_id)
+        return
+
+    hit_text = format_hit_text(hits)
+    dedup_key = f"{user_id}|{window_id}|{hit_text}"
     event = {
         "ts": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "window_id": window_id,
         "user_id": user_id,
         "hits": hits,
         "hit_text": hit_text,
@@ -312,10 +387,6 @@ def process_mysekai_alert(out_json, original_url):
         "dedup_key": dedup_key,
     }
     append_alert_event(event)
-
-    if not should_send_alert(dedup_key):
-        logger.info("Alert dedup skip: %s", dedup_key)
-        return
 
     _, hit_dir = ensure_alert_dirs()
     hit_archive = os.path.join(hit_dir, os.path.basename(out_json))
@@ -357,6 +428,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             };
             upload();
             """ % (PUBLIC_HOST, PORT)
+
             js_content = js_content.strip()
             self.send_response(200)
             self.send_header("Content-Type", "application/javascript; charset=utf-8")
@@ -423,6 +495,7 @@ if __name__ == "__main__":
     logger.info("Retention count per type: %s", RETENTION_COUNT)
     logger.info("Alert hit retention: %s", ALERT_HIT_RETENTION)
     logger.info("Alert event retention lines: %s", ALERT_EVENT_RETENTION_LINES)
+    logger.info("Alert window cache hours: %s", ALERT_WINDOW_CACHE_HOURS)
     logger.info(
         "Bot push: enabled=%s mode=%s target=%s url=%s retry=%s",
         BOT_PUSH_ENABLED,

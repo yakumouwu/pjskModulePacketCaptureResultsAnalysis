@@ -33,7 +33,7 @@ docker run -d \
   -e BOT_PUSH_MODE=<private_or_group> \
   -e BOT_TARGET_ID=<YOUR_QQ_OR_GROUP_ID> \
   -e BOT_PUSH_RETRY=3 \
-  -e ALERT_DEDUP_SECONDS=120 \
+  -e ALERT_WINDOW_CACHE_HOURS=72 \
   -e ALERT_HIT_RETENTION=100 \
   -e ALERT_EVENT_RETENTION_LINES=5000 \
   -v /opt/pjsk-captures:/data \
