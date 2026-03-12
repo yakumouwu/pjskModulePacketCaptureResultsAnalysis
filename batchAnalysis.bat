@@ -32,3 +32,4 @@ echo.
 echo [INFO] Script exited with code %RC%
 pause
 exit /b %RC%
+
