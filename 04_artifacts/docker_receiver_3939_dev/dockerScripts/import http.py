@@ -25,6 +25,7 @@ RAW_BASE_DIR = os.path.join(OUTPUT_ROOT, "raw_api")
 DECODED_BASE_DIR = os.path.join(OUTPUT_ROOT, "decoded_api")
 LOG_DIR = os.path.join(OUTPUT_ROOT, "logs")
 RETENTION_COUNT = int(os.environ.get("RETENTION_COUNT", "25"))
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 
 BOT_PUSH_ENABLED = os.environ.get("BOT_PUSH_ENABLED", "1") == "1"
 BOT_PUSH_URL = os.environ.get(
@@ -135,9 +136,13 @@ def setup_logging():
     os.makedirs(LOG_DIR, exist_ok=True)
     log_file = os.path.join(LOG_DIR, "receiver.log")
     root = logging.getLogger()
-    root.setLevel(logging.INFO)
+    level = getattr(logging, LOG_LEVEL, logging.INFO)
+    root.setLevel(level)
     root.handlers.clear()
-    fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+    fmt = logging.Formatter(
+        "%(asctime)s %(levelname)-5s %(name)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
     sh = logging.StreamHandler(sys.stdout)
     sh.setFormatter(fmt)
@@ -229,6 +234,7 @@ def decrypt_bin(api_type, raw_path, decoded_dir):
         "--region",
         REGION,
     ]
+    logger.debug("Decrypt command: %s", " ".join(cmd))
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode == 0 and os.path.exists(out_json):
         return out_json, "ok"
@@ -243,6 +249,7 @@ def render_suite_card(json_path, decoded_dir):
     os.makedirs(card_dir, exist_ok=True)
     card_path = os.path.join(card_dir, os.path.splitext(os.path.basename(json_path))[0] + ".png")
     cmd = [sys.executable, renderer, json_path, card_path]
+    logger.debug("Suite card render command: %s", " ".join(cmd))
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode == 0 and os.path.exists(card_path):
         return card_path, "ok"
@@ -261,6 +268,7 @@ def render_mysekai_map(json_path, decoded_dir):
     os.makedirs(map_dir, exist_ok=True)
     map_path = os.path.join(map_dir, os.path.splitext(os.path.basename(json_path))[0] + ".png")
     cmd = [sys.executable, renderer, json_path, map_path, assets_dir]
+    logger.debug("Mysekai map render command: %s", " ".join(cmd))
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode == 0 and os.path.exists(map_path):
         return map_path, "ok"
@@ -366,6 +374,7 @@ def send_bot_message(message):
     else:
         endpoint = f"{BOT_PUSH_URL}/send_private_msg"
         payload = {"user_id": int(BOT_TARGET_ID), "message": message}
+    logger.debug("Push endpoint: %s mode=%s target=%s", endpoint, BOT_PUSH_MODE, BOT_TARGET_ID)
 
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(endpoint, data=data, method="POST")
@@ -507,6 +516,12 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         original_url = self.headers.get("X-Original-Url", "")
         api_type = extract_api_type(original_url)
+        logger.debug(
+            "Incoming upload: api_type=%s content_length=%s source_path=%s",
+            api_type,
+            self.headers.get("Content-Length", "0"),
+            self.path,
+        )
         filename = generate_filename(api_type, original_url)
         content_length = int(self.headers["Content-Length"])
         received_data = self.rfile.read(content_length)
@@ -545,7 +560,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif dstatus == "skipped":
             logger.info("Decode skipped (api_type unsupported)")
         else:
-            logger.warning("Decode failed: %s", dstatus)
+            logger.error("Decode failed: %s", dstatus)
 
         self.send_response(200)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
@@ -568,6 +583,7 @@ if __name__ == "__main__":
     logger.info("Alert hit retention: %s", ALERT_HIT_RETENTION)
     logger.info("Alert event retention lines: %s", ALERT_EVENT_RETENTION_LINES)
     logger.info("Alert window cache hours: %s", ALERT_WINDOW_CACHE_HOURS)
+    logger.info("Log level: %s", logging.getLevelName(logging.getLogger().level))
     logger.info(
         "Bot push: enabled=%s mode=%s target=%s url=%s retry=%s",
         BOT_PUSH_ENABLED,
