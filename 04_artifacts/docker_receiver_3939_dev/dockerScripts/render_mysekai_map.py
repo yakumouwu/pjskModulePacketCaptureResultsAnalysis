@@ -71,6 +71,16 @@ def _env_float(name, default):
         return float(default)
 
 
+def _env_int(name, default):
+    v = os.environ.get(name)
+    if v is None or v == "":
+        return int(default)
+    try:
+        return int(v)
+    except Exception:
+        return int(default)
+
+
 def _get_font(size):
     font_paths = [
         os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "msyh.ttc"),
@@ -203,7 +213,10 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
 
     resource_icon_map = _load_resource_icon_map()
     icons = _load_icons(icon_dir, resource_icon_map)
-    font_count = _get_font(12)
+    icon_size = max(16, _env_int("MYSEKAI_ICON_SIZE", 36))
+    font_size = max(10, _env_int("MYSEKAI_COUNT_FONT_SIZE", 18))
+    spread = max(8, _env_int("MYSEKAI_ICON_SPREAD", 22))
+    font_count = _get_font(font_size)
 
     img = Image.open(bg_path).convert("RGBA")
     draw = ImageDraw.Draw(img)
@@ -249,64 +262,36 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
             main_key, main_qty = entries[0]
             icon = icons.get(main_key)
             if icon is not None:
-                icon_size = 24
                 icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
                 img.paste(icon_img, (px - icon_size // 2, py - icon_size // 2), icon_img)
             else:
                 draw.ellipse([px - 8, py - 8, px + 8, py + 8], fill=(120, 120, 120, 90), outline=(220, 220, 220, 180))
             text = str(main_qty)
-            tx = px + 10
-            ty = py + 6
+            tx = px + (icon_size // 2) - 2
+            ty = py + (icon_size // 3)
             for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                 draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
             draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
         else:
-            spread = 15
             for i, (key, qty) in enumerate(entries):
                 angle = (2 * math.pi * i / len(entries)) - math.pi / 2
                 ix = int(px + math.cos(angle) * spread)
                 iy = int(py + math.sin(angle) * spread)
                 icon = icons.get(key)
                 if icon is not None:
-                    icon_size = 24
                     icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
                     img.paste(icon_img, (ix - icon_size // 2, iy - icon_size // 2), icon_img)
                 else:
                     draw.ellipse([ix - 6, iy - 6, ix + 6, iy + 6], fill=(120, 120, 120, 90), outline=(220, 220, 220, 180))
                 text = str(qty)
-                tx = ix + 7
-                ty = iy + 4
+                tx = ix + (icon_size // 2) - 2
+                ty = iy + (icon_size // 3)
                 for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                     draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
                 draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
 
-    crop_pad = 50
-    xs = [p[0] for p in item_pixels]
-    ys = [p[1] for p in item_pixels]
-    l, t, r, b = min(xs) - crop_pad, min(ys) - crop_pad, max(xs) + crop_pad, max(ys) + crop_pad
-    span = max(r - l, b - t)
-    cx = (l + r) / 2.0
-    cy = (t + b) / 2.0
-    half = span / 2.0
-    cl = int(cx - half)
-    ct = int(cy - half)
-    cr = int(cx + half)
-    cb = int(cy + half)
-    if cl < 0:
-        cr -= cl
-        cl = 0
-    if ct < 0:
-        cb -= ct
-        ct = 0
-    if cr > img.width:
-        cl -= (cr - img.width)
-        cr = img.width
-    if cb > img.height:
-        ct -= (cb - img.height)
-        cb = img.height
-    cl = max(0, cl)
-    ct = max(0, ct)
-    panel = img.crop((cl, ct, cr, cb)).resize((int(target_size), int(target_size)), Image.LANCZOS)
+    # Keep full-map output so alerts always show complete site context.
+    panel = img.resize((int(target_size), int(target_size)), Image.LANCZOS)
     return panel, "ok"
 
 
