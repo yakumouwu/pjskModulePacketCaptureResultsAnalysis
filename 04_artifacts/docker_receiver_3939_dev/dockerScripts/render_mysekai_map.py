@@ -280,33 +280,8 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
                     draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
                 draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
 
-    crop_pad = 50
-    xs = [p[0] for p in item_pixels]
-    ys = [p[1] for p in item_pixels]
-    l, t, r, b = min(xs) - crop_pad, min(ys) - crop_pad, max(xs) + crop_pad, max(ys) + crop_pad
-    span = max(r - l, b - t)
-    cx = (l + r) / 2.0
-    cy = (t + b) / 2.0
-    half = span / 2.0
-    cl = int(cx - half)
-    ct = int(cy - half)
-    cr = int(cx + half)
-    cb = int(cy + half)
-    if cl < 0:
-        cr -= cl
-        cl = 0
-    if ct < 0:
-        cb -= ct
-        ct = 0
-    if cr > img.width:
-        cl -= (cr - img.width)
-        cr = img.width
-    if cb > img.height:
-        ct -= (cb - img.height)
-        cb = img.height
-    cl = max(0, cl)
-    ct = max(0, ct)
-    panel = img.crop((cl, ct, cr, cb)).resize((int(target_size), int(target_size)), Image.LANCZOS)
+    # Keep full-map output so alerts always show complete site context.
+    panel = img.resize((int(target_size), int(target_size)), Image.LANCZOS)
     return panel, "ok"
 
 
