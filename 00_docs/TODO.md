@@ -1,5 +1,19 @@
 # Receiver Roadmap (Security / Performance / Feature Expansion)
 
+## Recent updates
+- [x] Main receiver script text cleanup: removed mojibake labels/messages in `dockerScripts/import http.py`
+- [x] Startup logs now print local `datetime.now()` and `TZ` for time-window diagnostics
+- [x] Docs updated with `TZ=Asia/Shanghai` requirement for dedup-window correctness
+
+## Current priority
+- `P0`: Stabilize auto PR workflow and verify it can create/reopen PR after every `github-main-sync` push
+- `P0`: Add startup config validation for critical env vars (`BOT_PUSH_URL`, `BOT_PUSH_MODE`, `BOT_TARGET_ID`, `API_REGION`)
+- `P1`: Add failed-push retry queue (`/data/alerts/retry_queue.jsonl`) and background retry worker
+- `P1`: Add structured error codes in logs and include stderr on push/decrypt/render failures
+- `P1`: Add notification image push mode (text-only / image-only / text+image)
+- `P2`: Add metrics endpoint (`/metrics`) and daily summary task
+- `P2`: Introduce separate retention knobs by artifact type
+
 ## 0. Current status
 - [x] Capture `suite` / `mysekai` responses
 - [x] Decode API payloads

@@ -1,4 +1,4 @@
-import http.server
+﻿import http.server
 import json
 import logging
 import os
@@ -45,10 +45,10 @@ REQUEST_COUNTER = count(1)
 ALERT_DEDUP_CACHE = {}
 
 SITE_LABELS = {
-    5: "第一张图",
-    7: "第二张图",
-    6: "第三张图",
-    8: "第四张图",
+    5: "Map 1 (grassland)",
+    6: "Map 2 (beach)",
+    7: "Map 3 (flowergarden)",
+    8: "Map 4 (memorialplace)",
 }
 
 
@@ -349,7 +349,7 @@ def send_bot_message(message):
 def format_hit_text(hits):
     parts = []
     for sid, detail in sorted(hits.items()):
-        label = SITE_LABELS.get(sid, f"未知地图(siteId={sid})")
+        label = SITE_LABELS.get(sid, f"Unknown map (siteId={sid})")
         qty = detail.get("qty", 0)
         points = detail.get("points", [])
         if points:
@@ -360,12 +360,10 @@ def format_hit_text(hits):
                 elif "seq" in p:
                     point_text.append(f"(seq={p['seq']})")
             more = f"...(+{len(points)-6})" if len(points) > 6 else ""
-            parts.append(f"{label} 钻石{qty}，点位: {' '.join(point_text)}{more}")
+            parts.append(f"{label} diamond x{qty} points: {' '.join(point_text)}{more}")
         else:
-            parts.append(f"{label} 钻石{qty}，点位: siteId={sid}")
-    return "；".join(parts)
-
-
+            parts.append(f"{label} diamond x{qty} siteId={sid}")
+    return " | ".join(parts)
 def process_mysekai_alert(out_json, original_url):
     try:
         with open(out_json, "r", encoding="utf-8") as f:
@@ -415,7 +413,7 @@ def process_mysekai_alert(out_json, original_url):
     except Exception as e:
         logger.warning("Alert hit archive failed: %s", e)
 
-    message = f"[Mysekai 钻石提醒] 用户: {ALERT_USER_LABEL} {hit_text}"
+    message = f"[Mysekai diamond alarm] user: {ALERT_USER_LABEL} {hit_text}"
     ok, detail = send_bot_message(message)
     if ok:
         logger.info("Alert pushed: %s", detail)
@@ -512,6 +510,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     setup_logging()
     load_dedup_cache()
+    logger.info("Local datetime.now(): %s", datetime.now().isoformat(timespec="seconds"))
+    logger.info("Local timezone(TZ env): %s", os.environ.get("TZ", "(not set)"))
     logger.info("Universal Data Receiver running at http://0.0.0.0:%s", PORT)
     logger.info("Raw output root: %s", RAW_BASE_DIR)
     logger.info("Decoded output root: %s", DECODED_BASE_DIR)
@@ -535,3 +535,6 @@ if __name__ == "__main__":
             httpd.serve_forever()
     except KeyboardInterrupt:
         logger.info("Server stopped by user")
+
+
+
