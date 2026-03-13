@@ -1,0 +1,5 @@
+2026-03-13 17:28:04,019 [INFO] Alert hit archived: d:\reverse\04_artifacts\docker_receiver_3939_dev\02_captures\alerts\hits\mysekai_real_4maps_id12.json
+2026-03-13 17:28:06,078 [WARNING] Alert push failed: site=5 image=True detail=push_disabled
+2026-03-13 17:28:06,087 [WARNING] Alert push failed: site=6 image=True detail=push_disabled
+2026-03-13 17:28:06,092 [WARNING] Alert push failed: site=7 image=True detail=push_disabled
+2026-03-13 17:28:06,101 [WARNING] Alert push failed: site=8 image=True detail=push_disabled
