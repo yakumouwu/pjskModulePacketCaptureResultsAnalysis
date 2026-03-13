@@ -1,0 +1,26 @@
+# Ignore everything by default.
+*
+
+# Keep this file itself.
+!.gitignore
+!README.md
+!batchAnalysis.bat
+
+# Keep workflow files only.
+!.github/
+.github/*
+!.github/workflows/
+!.github/workflows/**
+
+# Keep these top-level project directories.
+!00_docs/
+!00_docs/**
+!01_scripts/
+!01_scripts/**
+!04_artifacts/
+!04_artifacts/**
+
+# Ignore generated artifacts inside whitelisted paths.
+01_scripts/**/__pycache__/
+04_artifacts/**/__pycache__/
+04_artifacts/**/*.tar
