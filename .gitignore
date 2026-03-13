@@ -1,0 +1,14 @@
+.edge-headless-profile/
+02_captures/
+03_packages/
+logs/
+__pycache__/
+*.pyc
+*.pyo
+*.tar
+*.zip
+ghidraAnalysis.lock
+ghidraAnalysis.lock~
+04_artifacts/temp_outputs/
+04_artifacts/web_refs/
+
