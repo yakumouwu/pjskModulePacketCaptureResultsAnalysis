@@ -43,7 +43,7 @@ def auto_decrypt_if_supported(api_type, raw_path, decoded_dir):
     json_name = os.path.splitext(os.path.basename(raw_path))[0] + ".json"
     json_path = os.path.join(decoded_dir, json_name)
 
-    # Prefer current interpreter to ensure conda consistency.
+    # Prefer current interpreter to ensure conda/env consistency.
     cmd = [
         sys.executable,
         "-m",
