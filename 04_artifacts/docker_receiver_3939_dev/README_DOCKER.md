@@ -25,6 +25,7 @@ docker run -d \
   --log-opt max-file=5 \
   -p 3939:3939 \
   -e PUBLIC_HOST=<YOUR_SERVER_PUBLIC_IP_OR_DOMAIN> \
+  -e TZ=Asia/Shanghai \
   -e RECEIVER_PORT=3939 \
   -e API_REGION=cn \
   -e OUTPUT_ROOT=/data \
@@ -47,6 +48,7 @@ docker run -d \
 Optional config file:
 - put `mysekai_resource_map.json` at `/opt/pjsk-config/mysekai_resource_map.json`
 - this improves material-id/icon mapping consistency across environments
+- keep `TZ=Asia/Shanghai`; dedup refresh windows (`05:00` / `17:00`) are based on container local time
 
 Quick checks after start:
 

@@ -46,6 +46,7 @@ docker run -d \
   --log-opt max-file=5 \
   -p 3939:3939 \
   -e PUBLIC_HOST=<YOUR_SERVER_PUBLIC_IP_OR_DOMAIN> \
+  -e TZ=Asia/Shanghai \
   -e RECEIVER_PORT=3939 \
   -e API_REGION=cn \
   -e OUTPUT_ROOT=/data \
@@ -124,6 +125,7 @@ PY
 Notes:
 - `BOT_TOKEN` is the NapCat HTTP server token (used as `Authorization: Bearer <token>`).
 - If `BOT_PUSH_URL` uses a container name (for example `http://napcat:3000`), ensure both containers are attached to the same Docker network.
+- Set `TZ=Asia/Shanghai` for the receiver container. The Mysekai dedup window (`05:00` / `17:00`) uses container local time.
 
 ## End-to-End Checklist (Capture -> Decode -> NapCat Push)
 
@@ -188,7 +190,7 @@ Use this checklist when you want the complete pipeline to work on a server.
 
 - Diamond alert source: decoded **full** Mysekai packet containing `mysekai_material:12`.
 - Dedup logic is window-based:
-  - refresh windows at local `05:00` and `17:00`
+  - refresh windows at container local `05:00` and `17:00`
   - same point in same window is not pushed repeatedly
   - dedup cache persisted at `/data/alerts/dedup_cache.json`
 - Retention:
