@@ -1,5 +1,7 @@
 # Mysekai/Suite Receiver Docker (Port 3939)
 
+Runtime scripts are stored in `dockerScripts/` and copied into the image as `/app/dockerScripts`.
+
 ## Build
 
 ```bash

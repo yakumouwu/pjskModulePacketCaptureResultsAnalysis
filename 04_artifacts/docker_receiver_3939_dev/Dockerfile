@@ -2,7 +2,7 @@
 
 WORKDIR /app
 
-COPY 01_scripts /app/01_scripts
+COPY dockerScripts /app/dockerScripts
 
 RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com sssekai Pillow
 
@@ -14,4 +14,4 @@ ENV MYSEKAI_RESOURCE_MAP_JSON=/data/config/mysekai_resource_map.json
 
 EXPOSE 3939
 
-CMD ["python", "/app/01_scripts/import http.py"]
+CMD ["python", "/app/dockerScripts/import http.py"]

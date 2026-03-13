@@ -18,6 +18,7 @@ This repository contains local and dockerized receivers for:
 ## Docker Receiver (Dev)
 
 - Directory: `04_artifacts/docker_receiver_3939_dev`
+- Runtime scripts: `04_artifacts/docker_receiver_3939_dev/dockerScripts`
 - Default port: `3939`
 - Health check: `GET /healthz`
 
@@ -107,7 +108,7 @@ data = {
 }
 with open(test_path, "w", encoding="utf-8") as f:
     json.dump(data, f, ensure_ascii=False)
-spec = importlib.util.spec_from_file_location("receiver", "/app/01_scripts/import http.py")
+spec = importlib.util.spec_from_file_location("receiver", "/app/dockerScripts/import http.py")
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 mod.setup_logging()
@@ -137,6 +138,7 @@ Use this checklist when you want the complete pipeline to work on a server.
 ### 2) Deploy receiver container
 
 - Build image from `04_artifacts/docker_receiver_3939_dev`.
+- The image copies runtime code from `dockerScripts/` into `/app/dockerScripts`.
 - Run with:
   - `-p 3939:3939`
   - `-v /opt/pjsk-captures:/data`
