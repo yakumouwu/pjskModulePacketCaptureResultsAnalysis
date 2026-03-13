@@ -1,17 +1,18 @@
-﻿import json
+import argparse
+import json
+import math
 import os
 from collections import OrderedDict
 
 from PIL import Image, ImageDraw, ImageFont
 
 SITE_CONFIG = {
-    5: {"name": "第一张图", "bg": "grassland.png", "transform": "zx_neg", "scale_add": (8.5, 8.5), "offset_add": (30.0, 0.0)},
-    7: {"name": "第三张图", "bg": "flowergarden.png", "transform": "zx_neg", "scale_add": (5.0, 3.0), "offset_add": (55.0, -70.0)},
-    6: {"name": "第二张图", "bg": "beach.png", "transform": "x_negz", "scale_add": (4.6, 4.2), "offset_add": (-70.0, 85.0)},
-    8: {"name": "第四张图", "bg": "memorialplace.png", "transform": "x_negz", "scale_add": (3.0, 0.0), "offset_add": (-185.0, 35.0)},
+    5: {"name": "Map 1", "bg": "grassland.png", "transform": "zx_neg", "scale_add": (8.5, 8.5), "offset_add": (30.0, 0.0)},
+    6: {"name": "Map 2", "bg": "beach.png", "transform": "x_negz", "scale_add": (4.6, 4.2), "offset_add": (-70.0, 85.0)},
+    7: {"name": "Map 3", "bg": "flowergarden.png", "transform": "zx_neg", "scale_add": (5.0, 3.0), "offset_add": (55.0, -70.0)},
+    8: {"name": "Map 4", "bg": "memorialplace.png", "transform": "x_negz", "scale_add": (3.0, 0.0), "offset_add": (-185.0, 35.0)},
 }
 
-# assetbundle icon name -> local png filename
 ASSET_ICON_TO_FILE = {
     "item_wood_1": "Wood_of_Feelings.png",
     "item_wood_2": "Heavy_Wood.png",
@@ -70,7 +71,6 @@ def _env_float(name, default):
         return float(default)
 
 
-
 def _get_font(size):
     font_paths = [
         os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "msyh.ttc"),
@@ -84,7 +84,6 @@ def _get_font(size):
     return ImageFont.load_default()
 
 
-
 def _transform(site_id, x, z):
     cfg = SITE_CONFIG.get(site_id, {})
     if cfg.get("transform") == "x_negz":
@@ -92,9 +91,7 @@ def _transform(site_id, x, z):
     return -z, -x
 
 
-
 def _find_map_json():
-    # Priority: env -> 01_scripts root map -> local copy
     env_path = os.environ.get("MYSEKAI_RESOURCE_MAP_JSON", "").strip()
     if env_path and os.path.isfile(env_path):
         return env_path
@@ -109,7 +106,6 @@ def _find_map_json():
     return ""
 
 
-
 def _load_resource_icon_map():
     mapping = dict(FALLBACK_ICON_MAP)
     map_json = _find_map_json()
@@ -122,8 +118,7 @@ def _load_resource_icon_map():
     except Exception:
         return mapping
 
-    material_meta = cfg.get("material_meta", {})
-    for k, meta in material_meta.items():
+    for k, meta in cfg.get("material_meta", {}).items():
         try:
             rid = int(k)
         except Exception:
@@ -133,9 +128,7 @@ def _load_resource_icon_map():
         if icon_file:
             mapping[("mysekai_material", rid)] = icon_file
 
-    # Optional direct icon key in map for item/music if present
-    item_meta = cfg.get("item_meta", {})
-    for k, meta in item_meta.items():
+    for k, meta in cfg.get("item_meta", {}).items():
         try:
             rid = int(k)
         except Exception:
@@ -145,8 +138,7 @@ def _load_resource_icon_map():
         if icon_file:
             mapping[("mysekai_item", rid)] = icon_file
 
-    music_meta = cfg.get("music_record_meta", {})
-    for k, meta in music_meta.items():
+    for k, meta in cfg.get("music_record_meta", {}).items():
         try:
             rid = int(k)
         except Exception:
@@ -159,7 +151,6 @@ def _load_resource_icon_map():
     return mapping
 
 
-
 def _load_icons(icon_dir, resource_icon_map):
     cache = {}
     for key, fname in resource_icon_map.items():
@@ -167,7 +158,6 @@ def _load_icons(icon_dir, resource_icon_map):
         if os.path.isfile(path):
             cache[key] = Image.open(path).convert("RGBA")
     return cache
-
 
 
 def _extract_points(mysekai_json):
@@ -189,191 +179,173 @@ def _extract_points(mysekai_json):
             rx, rz = _transform(site_id, float(x), float(z))
             k = (rx, rz)
             lst = coords.setdefault(k, [])
-            lst.append({"resourceType": resource_type, "resourceId": int(drop.get("resourceId", -1)), "qty": int(drop.get("quantity", 1))})
+            lst.append({
+                "resourceType": resource_type,
+                "resourceId": int(drop.get("resourceId", -1)),
+                "qty": int(drop.get("quantity", 1)),
+            })
     return points_by_site
 
+
+def _render_site(points_by_site, site_id, assets_dir, target_size):
+    coords = points_by_site.get(site_id, {})
+    if not coords:
+        return None, "no_points_for_site"
+
+    icon_dir = os.path.join(assets_dir, "icon")
+    map_dir = os.path.join(assets_dir, "map")
+    cfg = SITE_CONFIG.get(site_id)
+    if not cfg:
+        return None, "invalid_site_id"
+    bg_path = os.path.join(map_dir, cfg["bg"])
+    if not os.path.isfile(bg_path):
+        return None, "background_not_found"
+
+    resource_icon_map = _load_resource_icon_map()
+    icons = _load_icons(icon_dir, resource_icon_map)
+    font_count = _get_font(12)
+
+    img = Image.open(bg_path).convert("RGBA")
+    draw = ImageDraw.Draw(img)
+    bg_w, bg_h = img.size
+
+    all_x = [p[0] for p in coords]
+    all_z = [p[1] for p in coords]
+    min_x, max_x = min(all_x) - 1.0, max(all_x) + 1.0
+    min_z, max_z = min(all_z) - 1.0, max(all_z) + 1.0
+    range_x = max(1.0, max_x - min_x + 1.0)
+    range_z = max(1.0, max_z - min_z + 1.0)
+
+    usable_w = bg_w * 0.70
+    usable_h = bg_h * 0.70
+    base_scale = min(usable_w / range_x, usable_h / range_z)
+    scale_x = base_scale + cfg["scale_add"][0]
+    scale_z = base_scale + cfg["scale_add"][1]
+    scale_x += _env_float(f"SITE{site_id}_SCALE_X_DELTA", 0.0)
+    scale_z += _env_float(f"SITE{site_id}_SCALE_Z_DELTA", 0.0)
+
+    offset_x = (bg_w - range_x * scale_x) / 2.0 + cfg["offset_add"][0]
+    offset_z = (bg_h - range_z * scale_z) / 2.0 + cfg["offset_add"][1]
+    offset_x += _env_float(f"SITE{site_id}_OFFSET_X_DELTA", 0.0)
+    offset_z += _env_float(f"SITE{site_id}_OFFSET_Z_DELTA", 0.0)
+
+    def coord_to_px(cx, cz):
+        px = offset_x + (cx - min_x) * scale_x + scale_x / 2.0
+        pz = offset_z + (cz - min_z) * scale_z + scale_z / 2.0
+        return int(px), int(pz)
+
+    item_pixels = []
+    for (cx, cz), drops in coords.items():
+        px, py = coord_to_px(cx, cz)
+        item_pixels.append((px, py))
+
+        stat = {}
+        for d in drops:
+            key = (d["resourceType"], d["resourceId"])
+            stat[key] = stat.get(key, 0) + int(d["qty"])
+        entries = sorted(stat.items(), key=lambda t: t[1], reverse=True)
+
+        if len(entries) == 1:
+            main_key, main_qty = entries[0]
+            icon = icons.get(main_key)
+            if icon is not None:
+                icon_size = 24
+                icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
+                img.paste(icon_img, (px - icon_size // 2, py - icon_size // 2), icon_img)
+            else:
+                draw.ellipse([px - 8, py - 8, px + 8, py + 8], fill=(120, 120, 120, 90), outline=(220, 220, 220, 180))
+            text = str(main_qty)
+            tx = px + 10
+            ty = py + 6
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
+            draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
+        else:
+            spread = 15
+            for i, (key, qty) in enumerate(entries):
+                angle = (2 * math.pi * i / len(entries)) - math.pi / 2
+                ix = int(px + math.cos(angle) * spread)
+                iy = int(py + math.sin(angle) * spread)
+                icon = icons.get(key)
+                if icon is not None:
+                    icon_size = 24
+                    icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
+                    img.paste(icon_img, (ix - icon_size // 2, iy - icon_size // 2), icon_img)
+                else:
+                    draw.ellipse([ix - 6, iy - 6, ix + 6, iy + 6], fill=(120, 120, 120, 90), outline=(220, 220, 220, 180))
+                text = str(qty)
+                tx = ix + 7
+                ty = iy + 4
+                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
+                draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
+
+    crop_pad = 50
+    xs = [p[0] for p in item_pixels]
+    ys = [p[1] for p in item_pixels]
+    l, t, r, b = min(xs) - crop_pad, min(ys) - crop_pad, max(xs) + crop_pad, max(ys) + crop_pad
+    span = max(r - l, b - t)
+    cx = (l + r) / 2.0
+    cy = (t + b) / 2.0
+    half = span / 2.0
+    cl = int(cx - half)
+    ct = int(cy - half)
+    cr = int(cx + half)
+    cb = int(cy + half)
+    if cl < 0:
+        cr -= cl
+        cl = 0
+    if ct < 0:
+        cb -= ct
+        ct = 0
+    if cr > img.width:
+        cl -= (cr - img.width)
+        cr = img.width
+    if cb > img.height:
+        ct -= (cb - img.height)
+        cb = img.height
+    cl = max(0, cl)
+    ct = max(0, ct)
+    panel = img.crop((cl, ct, cr, cb)).resize((int(target_size), int(target_size)), Image.LANCZOS)
+    return panel, "ok"
+
+
+def render_single_site_image(json_path, out_path, assets_dir, site_id, target_size=1024):
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    points_by_site = _extract_points(data)
+    panel, status = _render_site(points_by_site, site_id, assets_dir, target_size)
+    if panel is None:
+        return False, status
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    panel.save(out_path)
+    return True, "ok"
 
 
 def render_mysekai_map_image(json_path, out_path, assets_dir):
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
-
     points_by_site = _extract_points(data)
     if not points_by_site:
         return False, "no_points"
 
-    icon_dir = os.path.join(assets_dir, "icon")
-    map_dir = os.path.join(assets_dir, "map")
-
-    resource_icon_map = _load_resource_icon_map()
-    icons = _load_icons(icon_dir, resource_icon_map)
-    font_count = _get_font(12)
-    font_title = _get_font(20)
-
+    target = 768
     rendered = OrderedDict()
-    map_item_pixels = OrderedDict()
-    crop_pad = 50
-
-    for site_id in (5, 7, 6, 8):
-        if site_id not in points_by_site:
-            continue
-        cfg = SITE_CONFIG[site_id]
-        bg_path = os.path.join(map_dir, cfg["bg"])
-        if not os.path.isfile(bg_path):
-            continue
-
-        coords = points_by_site[site_id]
-        if not coords:
-            continue
-
-        img = Image.open(bg_path).convert("RGBA")
-        draw = ImageDraw.Draw(img)
-        bg_w, bg_h = img.size
-
-        all_x = [p[0] for p in coords]
-        all_z = [p[1] for p in coords]
-        min_x, max_x = min(all_x) - 1.0, max(all_x) + 1.0
-        min_z, max_z = min(all_z) - 1.0, max(all_z) + 1.0
-        range_x = max(1.0, max_x - min_x + 1.0)
-        range_z = max(1.0, max_z - min_z + 1.0)
-
-        usable_w = bg_w * 0.70
-        usable_h = bg_h * 0.70
-        base_scale = min(usable_w / range_x, usable_h / range_z)
-        scale_x = base_scale + cfg["scale_add"][0]
-        scale_z = base_scale + cfg["scale_add"][1]
-
-        # Optional per-site tuning from environment.
-        scale_x += _env_float(f"SITE{site_id}_SCALE_X_DELTA", 0.0)
-        scale_z += _env_float(f"SITE{site_id}_SCALE_Z_DELTA", 0.0)
-
-        offset_x = (bg_w - range_x * scale_x) / 2.0 + cfg["offset_add"][0]
-        offset_z = (bg_h - range_z * scale_z) / 2.0 + cfg["offset_add"][1]
-        offset_x += _env_float(f"SITE{site_id}_OFFSET_X_DELTA", 0.0)
-        offset_z += _env_float(f"SITE{site_id}_OFFSET_Z_DELTA", 0.0)
-
-        def coord_to_px(cx, cz):
-            px = offset_x + (cx - min_x) * scale_x + scale_x / 2.0
-            pz = offset_z + (cz - min_z) * scale_z + scale_z / 2.0
-            return int(px), int(pz)
-
-        item_pixels = []
-        for idx, ((cx, cz), drops) in enumerate(coords.items()):
-            px, py = coord_to_px(cx, cz)
-            item_pixels.append((px, py))
-
-            stat = {}
-            for d in drops:
-                key = (d["resourceType"], d["resourceId"])
-                stat[key] = stat.get(key, 0) + int(d["qty"])
-            entries = sorted(stat.items(), key=lambda t: t[1], reverse=True)
-
-            if len(entries) == 1:
-                main_key, main_qty = entries[0]
-                icon = icons.get(main_key)
-                if icon is not None:
-                    icon_size = 24
-                    icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
-                    img.paste(icon_img, (px - icon_size // 2, py - icon_size // 2), icon_img)
-                else:
-                    r = 8
-                    draw.ellipse([px - r, py - r, px + r, py + r], fill=(120, 120, 120, 90), outline=(220, 220, 220, 180))
-
-                text = str(main_qty)
-                tx = px + 10
-                ty = py + 6
-                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                    draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
-                draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
-            else:
-                import math
-
-                spread = 15
-                for i, (key, qty) in enumerate(entries):
-                    angle = (2 * math.pi * i / len(entries)) - math.pi / 2
-                    ix = int(px + math.cos(angle) * spread)
-                    iy = int(py + math.sin(angle) * spread)
-                    icon = icons.get(key)
-                    if icon is not None:
-                        icon_size = 24
-                        icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
-                        img.paste(icon_img, (ix - icon_size // 2, iy - icon_size // 2), icon_img)
-                    else:
-                        draw.ellipse([ix - 6, iy - 6, ix + 6, iy + 6], fill=(120, 120, 120, 90), outline=(220, 220, 220, 180))
-
-                    text = str(qty)
-                    tx = ix + 7
-                    ty = iy + 4
-                    for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                        draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
-                    draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
-
-        rendered[site_id] = img
-        map_item_pixels[site_id] = item_pixels
+    for sid in (5, 7, 6, 8):
+        panel, status = _render_site(points_by_site, sid, assets_dir, target)
+        if panel is not None:
+            rendered[sid] = panel
 
     if not rendered:
         return False, "no_site_image"
 
-    no_autocrop = os.environ.get("MYSEKAI_NO_AUTOCROP", "0") == "1"
-    cropped = OrderedDict()
-    if no_autocrop:
-        for sid in (5, 7, 6, 8):
-            if sid in rendered:
-                cropped[sid] = rendered[sid]
-    else:
-        bboxes = {}
-        for sid, img in rendered.items():
-            pts = map_item_pixels.get(sid, [])
-            if not pts:
-                bboxes[sid] = (0, 0, img.width, img.height)
-                continue
-            xs = [p[0] for p in pts]
-            ys = [p[1] for p in pts]
-            bboxes[sid] = (min(xs) - crop_pad, min(ys) - crop_pad, max(xs) + crop_pad, max(ys) + crop_pad)
-
-        spans = [max(r - l, b - t) for l, t, r, b in bboxes.values()]
-        uniform = max(spans) if spans else 512
-
-        for sid in (5, 7, 6, 8):
-            if sid not in rendered:
-                continue
-            img = rendered[sid]
-            l, t, r, b = bboxes[sid]
-            cx = (l + r) / 2.0
-            cy = (t + b) / 2.0
-            half = uniform / 2.0
-            cl = int(cx - half)
-            ct = int(cy - half)
-            cr = int(cx + half)
-            cb = int(cy + half)
-            if cl < 0:
-                cr -= cl
-                cl = 0
-            if ct < 0:
-                cb -= ct
-                ct = 0
-            if cr > img.width:
-                cl -= (cr - img.width)
-                cr = img.width
-            if cb > img.height:
-                ct -= (cb - img.height)
-                cb = img.height
-            cl = max(0, cl)
-            ct = max(0, ct)
-            cropped[sid] = img.crop((cl, ct, cr, cb))
-
-    target = max(im.width for im in cropped.values())
     grid = Image.new("RGBA", (target * 2, target * 2 + 48), (18, 22, 30, 255))
     title = ImageDraw.Draw(grid)
-    title.text((16, 10), "MySekai Resource Map", fill=(240, 240, 245), font=font_title)
-
+    title.text((16, 10), "MySekai Resource Map", fill=(240, 240, 245), font=_get_font(20))
     panel_pos = {5: (0, 48), 7: (target, 48), 6: (0, target + 48), 8: (target, target + 48)}
     for sid, pos in panel_pos.items():
-        x, y = pos
-        if sid not in cropped:
-            continue
-        panel = cropped[sid].resize((target, target), Image.LANCZOS)
-        grid.paste(panel, (x, y), panel)
+        if sid in rendered:
+            grid.paste(rendered[sid], pos, rendered[sid])
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     grid.save(out_path)
@@ -381,14 +353,23 @@ def render_mysekai_map_image(json_path, out_path, assets_dir):
 
 
 if __name__ == "__main__":
-    import argparse
-
     ap = argparse.ArgumentParser()
     ap.add_argument("json_path")
     ap.add_argument("out_path")
     ap.add_argument("assets_dir")
+    ap.add_argument("--site-id", type=int, default=None)
+    ap.add_argument("--target-size", type=int, default=1024)
     args = ap.parse_args()
 
-    ok, msg = render_mysekai_map_image(args.json_path, args.out_path, args.assets_dir)
+    if args.site_id is None:
+        ok, msg = render_mysekai_map_image(args.json_path, args.out_path, args.assets_dir)
+    else:
+        ok, msg = render_single_site_image(
+            args.json_path,
+            args.out_path,
+            args.assets_dir,
+            args.site_id,
+            args.target_size,
+        )
     if not ok:
         raise SystemExit(msg)

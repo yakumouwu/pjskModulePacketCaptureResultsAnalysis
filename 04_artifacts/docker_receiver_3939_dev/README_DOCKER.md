@@ -36,9 +36,12 @@ docker run -d \
   -e BOT_PUSH_MODE=<private_or_group> \
   -e BOT_TARGET_ID=<YOUR_QQ_OR_GROUP_ID> \
   -e BOT_PUSH_RETRY=3 \
+  -e BOT_MESSAGE_MODE=text+image \
+  -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e ALERT_WINDOW_CACHE_HOURS=72 \
   -e ALERT_HIT_RETENTION=100 \
   -e ALERT_EVENT_RETENTION_LINES=5000 \
+  -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
   pjsk-receiver:3939
@@ -47,6 +50,7 @@ docker run -d \
 Optional config file:
 - put `mysekai_resource_map.json` at `/opt/pjsk-config/mysekai_resource_map.json`
 - this improves material-id/icon mapping consistency across environments
+- set `TZ=Asia/Shanghai`; dedup windows (`05:00` / `17:00`) use container local time
 
 Quick checks after start:
 
@@ -64,10 +68,23 @@ curl -sS http://127.0.0.1:3939/healthz
 - mysekai rendered maps: /data/decoded_api/mysekai/maps
 - service logs (rolling): /data/logs/receiver.log
 - diamond alert trigger: decoded mysekai full packet contains `mysekai_material:12`
+- render trigger: only when id=12 hit passes dedup in current time window
+- render output: one image per hit site; only hit sites are generated/sent
 - diamond hit archives: /data/alerts/hits/
 - diamond alert events: /data/alerts/diamond_events.jsonl
 - health check endpoint: GET /healthz
 - `BOT_TOKEN` is the NapCat HTTP server token (Authorization Bearer token)
+
+## NapCat API baseline (v4.17.48)
+
+For push implementation, use these action endpoints:
+- `POST {BOT_PUSH_URL}/send_private_msg`
+- `POST {BOT_PUSH_URL}/send_group_msg`
+
+Message body:
+- `message` can be plain string, or segment array
+- image segment:
+  - `{"type":"image","data":{"file":"<path|url|base64>"}}`
 
 ## Host mapped path example
 

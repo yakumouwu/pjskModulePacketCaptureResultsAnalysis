@@ -1,4 +1,5 @@
-import http.server
+﻿import http.server
+import base64
 import json
 import logging
 import os
@@ -36,6 +37,8 @@ BOT_TARGET_ID = os.environ.get("BOT_TARGET_ID", "0").strip()
 ALERT_USER_LABEL = os.environ.get("ALERT_USER_LABEL", "player").strip()
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "").strip()
 BOT_PUSH_RETRY = int(os.environ.get("BOT_PUSH_RETRY", "3"))
+BOT_MESSAGE_MODE = os.environ.get("BOT_MESSAGE_MODE", "text+image").strip().lower()
+MYSEKAI_MAP_IMAGE_SIZE = int(os.environ.get("MYSEKAI_MAP_IMAGE_SIZE", "1024"))
 
 ALERT_HIT_RETENTION = int(os.environ.get("ALERT_HIT_RETENTION", "100"))
 ALERT_EVENT_RETENTION_LINES = int(os.environ.get("ALERT_EVENT_RETENTION_LINES", "5000"))
@@ -45,10 +48,10 @@ REQUEST_COUNTER = count(1)
 ALERT_DEDUP_CACHE = {}
 
 SITE_LABELS = {
-    5: "第一张图",
-    7: "第二张图",
-    6: "第三张图",
-    8: "第四张图",
+    5: "Map 1 (grassland)",
+    6: "Map 2 (beach)",
+    7: "Map 3 (flowergarden)",
+    8: "Map 4 (memorialplace)",
 }
 
 
@@ -206,22 +209,41 @@ def render_suite_card(json_path, decoded_dir):
     return None, (proc.stderr or proc.stdout or "render_failed").strip()
 
 
-def render_mysekai_map(json_path, decoded_dir):
+def render_mysekai_site_maps(json_path, decoded_dir, site_ids):
     renderer = os.path.join(os.path.dirname(__file__), "render_mysekai_map.py")
     assets_dir = os.path.join(os.path.dirname(__file__), "mysekai_assets")
     if not os.path.exists(renderer):
-        return None, "renderer_not_found"
+        return {}, "renderer_not_found"
     if not os.path.isdir(assets_dir):
-        return None, "assets_not_found"
+        return {}, "assets_not_found"
 
     map_dir = os.path.join(decoded_dir, "maps")
     os.makedirs(map_dir, exist_ok=True)
-    map_path = os.path.join(map_dir, os.path.splitext(os.path.basename(json_path))[0] + ".png")
-    cmd = [sys.executable, renderer, json_path, map_path, assets_dir]
-    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    if proc.returncode == 0 and os.path.exists(map_path):
-        return map_path, "ok"
-    return None, (proc.stderr or proc.stdout or "render_failed").strip()
+    base_name = os.path.splitext(os.path.basename(json_path))[0]
+    rendered_paths = {}
+    failed = []
+    for sid in sorted(site_ids):
+        map_path = os.path.join(map_dir, f"{base_name}_site{sid}.png")
+        cmd = [
+            sys.executable,
+            renderer,
+            json_path,
+            map_path,
+            assets_dir,
+            "--site-id",
+            str(sid),
+            "--target-size",
+            str(MYSEKAI_MAP_IMAGE_SIZE),
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if proc.returncode == 0 and os.path.exists(map_path):
+            rendered_paths[sid] = map_path
+            continue
+        failed.append(f"site={sid}:{(proc.stderr or proc.stdout or 'render_failed').strip()}")
+
+    if not rendered_paths:
+        return {}, "; ".join(failed) if failed else "render_failed"
+    return rendered_paths, "ok"
 
 
 def is_mysekai_full_packet(json_data):
@@ -317,6 +339,9 @@ def send_bot_message(message):
     if not BOT_TARGET_ID or BOT_TARGET_ID == "0":
         return False, "missing_bot_target_id"
 
+    if BOT_PUSH_MODE not in ("private", "group"):
+        return False, f"invalid_push_mode:{BOT_PUSH_MODE}"
+
     if BOT_PUSH_MODE == "group":
         endpoint = f"{BOT_PUSH_URL}/send_group_msg"
         payload = {"group_id": int(BOT_TARGET_ID), "message": message}
@@ -346,10 +371,46 @@ def send_bot_message(message):
     return False, last_err
 
 
+def image_to_segment(image_path):
+    try:
+        with open(image_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("ascii")
+        return {"type": "image", "data": {"file": "base64://" + b64}}
+    except Exception as e:
+        logger.warning("Image encode failed: %s", e)
+        return None
+
+
+def push_text_with_optional_image(text, image_path=None):
+    mode = BOT_MESSAGE_MODE
+    if mode not in ("text", "image", "text+image"):
+        mode = "text+image"
+
+    if mode == "text" or not image_path:
+        return send_bot_message(text)
+
+    image_segment = image_to_segment(image_path)
+    if image_segment is None:
+        return send_bot_message(text)
+
+    if mode == "image":
+        ok, detail = send_bot_message([image_segment])
+        if ok:
+            return ok, detail
+        return send_bot_message(text)
+
+    # text+image default
+    payload = [{"type": "text", "data": {"text": text}}, image_segment]
+    ok, detail = send_bot_message(payload)
+    if ok:
+        return ok, detail
+    return send_bot_message(text)
+
+
 def format_hit_text(hits):
     parts = []
     for sid, detail in sorted(hits.items()):
-        label = SITE_LABELS.get(sid, f"未知地图(siteId={sid})")
+        label = SITE_LABELS.get(sid, f"Unknown map(siteId={sid})")
         qty = detail.get("qty", 0)
         points = detail.get("points", [])
         if points:
@@ -360,12 +421,10 @@ def format_hit_text(hits):
                 elif "seq" in p:
                     point_text.append(f"(seq={p['seq']})")
             more = f"...(+{len(points)-6})" if len(points) > 6 else ""
-            parts.append(f"{label} 钻石{qty}，点位: {' '.join(point_text)}{more}")
+            parts.append(f"{label} diamond x{qty} points {' '.join(point_text)}{more}")
         else:
-            parts.append(f"{label} 钻石{qty}，点位: siteId={sid}")
-    return "；".join(parts)
-
-
+            parts.append(f"{label} diamond x{qty} siteId={sid}")
+    return " | ".join(parts)
 def process_mysekai_alert(out_json, original_url):
     try:
         with open(out_json, "r", encoding="utf-8") as f:
@@ -415,12 +474,23 @@ def process_mysekai_alert(out_json, original_url):
     except Exception as e:
         logger.warning("Alert hit archive failed: %s", e)
 
-    message = f"[Mysekai 钻石提醒] 用户: {ALERT_USER_LABEL} {hit_text}"
-    ok, detail = send_bot_message(message)
-    if ok:
-        logger.info("Alert pushed: %s", detail)
+    map_paths, map_status = render_mysekai_site_maps(out_json, os.path.dirname(out_json), hits.keys())
+    if map_status == "ok":
+        map_dir = os.path.join(os.path.dirname(out_json), "maps")
+        prune_old_files(map_dir, "mysekai_*.png", RETENTION_COUNT)
     else:
-        logger.warning("Alert push failed: %s", detail)
+        logger.warning("Mysekai site map render failed: %s", map_status)
+
+    for sid, detail in sorted(hits.items()):
+        label = SITE_LABELS.get(sid, f"Unknown map(siteId={sid})")
+        qty = detail.get("qty", 0)
+        message = f"[Mysekai diamond alarm] user: {ALERT_USER_LABEL} {label} diamond x{qty}"
+        image_path = map_paths.get(sid)
+        ok, detail_msg = push_text_with_optional_image(message, image_path)
+        if ok:
+            logger.info("Alert pushed: site=%s image=%s detail=%s", sid, bool(image_path), detail_msg)
+        else:
+            logger.warning("Alert push failed: site=%s image=%s detail=%s", sid, bool(image_path), detail_msg)
 
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -491,13 +561,6 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 else:
                     logger.warning("Card render failed: %s", cstatus)
             elif api_type == "mysekai":
-                map_path, mstatus = render_mysekai_map(out_json, decoded_dir)
-                if mstatus == "ok":
-                    map_dir = os.path.join(decoded_dir, "maps")
-                    prune_old_files(map_dir, "mysekai_*.png", RETENTION_COUNT)
-                    logger.info("Mysekai Map Image: %s", map_path)
-                else:
-                    logger.warning("Mysekai map render failed: %s", mstatus)
                 process_mysekai_alert(out_json, original_url)
         elif dstatus == "skipped":
             logger.info("Decode skipped (api_type unsupported)")
@@ -529,9 +592,14 @@ if __name__ == "__main__":
         BOT_PUSH_URL or "(empty)",
         BOT_PUSH_RETRY,
     )
+    logger.info("Bot message mode: %s", BOT_MESSAGE_MODE)
+    logger.info("Mysekai map image size: %s", MYSEKAI_MAP_IMAGE_SIZE)
     logger.info("File naming format: [api_type]_[user]_[timestamp]_[ms]_[pid]_[seq].bin")
     try:
         with socketserver.TCPServer(("", PORT), RequestHandler) as httpd:
             httpd.serve_forever()
     except KeyboardInterrupt:
         logger.info("Server stopped by user")
+
+
+

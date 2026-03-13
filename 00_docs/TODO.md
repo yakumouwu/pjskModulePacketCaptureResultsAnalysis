@@ -37,6 +37,7 @@
 ## 4. Notification features
 - [ ] Group push support with optional `@` mention (CQ code or message segment)
 - [ ] Push rendered Mysekai map image (in addition to text), with switchable modes: text-only / image-only / text+image
+- [ ] Align image push payload with NapCat v4.17.48 action/message format
 - [ ] Template system for notification text (single-line / multi-line / compact)
 - [ ] Add map label from config file instead of hard-coded mapping
 - [ ] Add optional cooldown per `siteId` to reduce spam

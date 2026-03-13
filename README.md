@@ -57,9 +57,12 @@ docker run -d \
   -e BOT_PUSH_MODE=<private_or_group> \
   -e BOT_TARGET_ID=<YOUR_QQ_OR_GROUP_ID> \
   -e BOT_PUSH_RETRY=3 \
+  -e BOT_MESSAGE_MODE=text+image \
+  -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e ALERT_WINDOW_CACHE_HOURS=72 \
   -e ALERT_HIT_RETENTION=100 \
   -e ALERT_EVENT_RETENTION_LINES=5000 \
+  -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
   pjsk-receiver:dev3939
@@ -124,6 +127,26 @@ PY
 Notes:
 - `BOT_TOKEN` is the NapCat HTTP server token (used as `Authorization: Bearer <token>`).
 - If `BOT_PUSH_URL` uses a container name (for example `http://napcat:3000`), ensure both containers are attached to the same Docker network.
+- Set `TZ=Asia/Shanghai` for the receiver container. Dedup windows (`05:00` / `17:00`) use container local time.
+
+## NapCat API baseline (v4.17.48)
+
+Use these interfaces and message structures for text/image push:
+
+- Actions:
+  - `POST {BOT_PUSH_URL}/send_private_msg`
+  - `POST {BOT_PUSH_URL}/send_group_msg`
+- `message` supports both `string` and `array` (message segments).
+- OneBot image segment:
+  - `{"type":"image","data":{"file":"<path|url|base64>"}}`
+- Text + image example:
+
+```json
+[
+  {"type":"text","data":{"text":"diamond hit"}},
+  {"type":"image","data":{"file":"https://example.com/map.png"}}
+]
+```
 
 ## End-to-End Checklist (Capture -> Decode -> NapCat Push)
 
@@ -187,10 +210,15 @@ Use this checklist when you want the complete pipeline to work on a server.
 ### 7) Runtime behavior (current implementation)
 
 - Diamond alert source: decoded **full** Mysekai packet containing `mysekai_material:12`.
+- Map render trigger: only when alert condition is met (id=12 + dedup pass in current window).
+- Render output: one map image per hit site; only hit sites are rendered/sent; no multi-map merge.
 - Dedup logic is window-based:
   - refresh windows at local `05:00` and `17:00`
   - same point in same window is not pushed repeatedly
   - dedup cache persisted at `/data/alerts/dedup_cache.json`
+- Push payload:
+  - default `BOT_MESSAGE_MODE=text+image`
+  - image push failure falls back to text push
 - Retention:
   - raw/decoded/cards keep latest `RETENTION_COUNT`
   - alert hit files keep `ALERT_HIT_RETENTION`
