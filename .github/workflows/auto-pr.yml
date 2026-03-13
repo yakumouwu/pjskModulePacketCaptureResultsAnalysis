@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - github-main-sync
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -23,28 +24,47 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const head = `${owner}:github-main-sync`;
+            const headRef = "github-main-sync";
+            const head = `${owner}:${headRef}`;
             const base = "main";
 
             const { data: pulls } = await github.rest.pulls.list({
               owner,
               repo,
-              state: "open",
+              state: "all",
               head,
               base,
               per_page: 100
             });
 
             if (pulls.length > 0) {
-              core.info(`Open PR already exists: #${pulls[0].number}`);
-              return;
+              const latest = pulls[0];
+              if (latest.state === "open") {
+                core.info(`Open PR already exists: #${latest.number}`);
+                return;
+              }
+
+              try {
+                await github.rest.pulls.update({
+                  owner,
+                  repo,
+                  pull_number: latest.number,
+                  state: "open"
+                });
+                core.info(`Reopened PR #${latest.number}`);
+                return;
+              } catch (e) {
+                core.warning(
+                  `Failed to reopen PR #${latest.number}, will try creating a new PR. ${e.message}`
+                );
+              }
             }
 
             const { data: pr } = await github.rest.pulls.create({
               owner,
               repo,
               title: "Auto sync github-main-sync -> main",
-              head: "github-main-sync",
+              head: headRef,
               base,
               body: [
                 "This PR was created automatically after a push to `github-main-sync`.",
