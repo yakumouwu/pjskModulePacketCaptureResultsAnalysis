@@ -59,6 +59,9 @@ docker run -d \
   -e BOT_PUSH_RETRY=3 \
   -e BOT_MESSAGE_MODE=text+image \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
+  -e MYSEKAI_ICON_SIZE=36 \
+  -e MYSEKAI_COUNT_FONT_SIZE=18 \
+  -e MYSEKAI_ICON_SPREAD=22 \
   -e ALERT_WINDOW_CACHE_HOURS=72 \
   -e ALERT_HIT_RETENTION=100 \
   -e ALERT_EVENT_RETENTION_LINES=5000 \
@@ -219,6 +222,11 @@ Use this checklist when you want the complete pipeline to work on a server.
 - Push payload:
   - default `BOT_MESSAGE_MODE=text+image`
   - image push failure falls back to text push
+- Render visibility tuning:
+  - `MYSEKAI_MAP_IMAGE_SIZE` controls output size
+  - `MYSEKAI_ICON_SIZE` controls icon size
+  - `MYSEKAI_COUNT_FONT_SIZE` controls quantity text size
+  - `MYSEKAI_ICON_SPREAD` controls multi-icon spacing at same point
 - Retention:
   - raw/decoded/cards keep latest `RETENTION_COUNT`
   - alert hit files keep `ALERT_HIT_RETENTION`

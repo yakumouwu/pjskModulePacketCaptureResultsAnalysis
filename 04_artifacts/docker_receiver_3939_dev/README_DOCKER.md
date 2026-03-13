@@ -38,6 +38,9 @@ docker run -d \
   -e BOT_PUSH_RETRY=3 \
   -e BOT_MESSAGE_MODE=text+image \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
+  -e MYSEKAI_ICON_SIZE=36 \
+  -e MYSEKAI_COUNT_FONT_SIZE=18 \
+  -e MYSEKAI_ICON_SPREAD=22 \
   -e ALERT_WINDOW_CACHE_HOURS=72 \
   -e ALERT_HIT_RETENTION=100 \
   -e ALERT_EVENT_RETENTION_LINES=5000 \
@@ -70,6 +73,11 @@ curl -sS http://127.0.0.1:3939/healthz
 - diamond alert trigger: decoded mysekai full packet contains `mysekai_material:12`
 - render trigger: only when id=12 hit passes dedup in current time window
 - render output: one image per hit site; only hit sites are generated/sent
+- render tuning:
+  - `MYSEKAI_MAP_IMAGE_SIZE`: final output size
+  - `MYSEKAI_ICON_SIZE`: icon size on map
+  - `MYSEKAI_COUNT_FONT_SIZE`: quantity text size
+  - `MYSEKAI_ICON_SPREAD`: spread radius for multi-resource points
 - diamond hit archives: /data/alerts/hits/
 - diamond alert events: /data/alerts/diamond_events.jsonl
 - health check endpoint: GET /healthz

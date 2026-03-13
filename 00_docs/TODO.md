@@ -8,6 +8,8 @@
 - [x] Push notification via NapCat HTTP API
 - [x] Log rotation and file retention
 - [x] Health check endpoint (`/healthz`)
+- [x] Full-site Mysekai map output for alerts (no point-only crop)
+- [x] Configurable Mysekai icon/text sizing (`MYSEKAI_ICON_SIZE`, `MYSEKAI_COUNT_FONT_SIZE`, `MYSEKAI_ICON_SPREAD`)
 
 ## 1. Security hardening
 - [ ] Add shared-secret verification on `/upload` requests (header signature), reject unknown source
