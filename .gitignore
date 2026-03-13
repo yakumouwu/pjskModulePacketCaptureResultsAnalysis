@@ -6,10 +6,6 @@
 !README.md
 !batchAnalysis.bat
 
-# Ignore generated artifacts inside whitelisted paths.
-**/__pycache__/
-*.tar
-
 # Keep workflow files only.
 !.github/
 .github/*
@@ -23,3 +19,8 @@
 !01_scripts/**
 !04_artifacts/
 !04_artifacts/**
+
+# Ignore generated artifacts inside whitelisted paths.
+01_scripts/**/__pycache__/
+04_artifacts/**/__pycache__/
+04_artifacts/**/*.tar
