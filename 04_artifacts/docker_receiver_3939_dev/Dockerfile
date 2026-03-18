@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY dockerScripts /app/dockerScripts
 
-RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com sssekai Pillow
+RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com sssekai==0.7.62 Pillow
 
 ENV RECEIVER_PORT=3939
 ENV API_REGION=cn
