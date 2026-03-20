@@ -6,7 +6,7 @@ Runtime scripts are stored in `dockerScripts/` and copied into the image as `/ap
 ## Build
 
 ```bash
-docker build -t pjsk-receiver:3939 .
+docker build -t pjsk-receiver:latest .
 ```
 
 ## Run
@@ -48,7 +48,7 @@ docker run -d \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
-  pjsk-receiver:3939
+  pjsk-receiver:latest
 ```
 
 Optional config file:

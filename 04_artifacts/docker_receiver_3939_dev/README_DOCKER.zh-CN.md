@@ -6,7 +6,7 @@
 ## 构建镜像
 
 ```bash
-docker build -t pjsk-receiver:3939 .
+docker build -t pjsk-receiver:latest .
 ```
 
 ## 启动容器
@@ -48,7 +48,7 @@ docker run -d \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
-  pjsk-receiver:3939
+  pjsk-receiver:latest
 ```
 
 可选配置文件：

@@ -3,24 +3,18 @@
 
 ## Overview
 
-This repository contains local and dockerized receivers for:
-- capturing `suite` / `mysekai` API payloads
+This repository provides local and Docker receivers for:
+- capturing API responses
 - decoding payloads
-- generating suite card images
-- optional Mysekai diamond (`id=12`) notification push via NapCat
+- generating user profile card images
+- sending Mysekai diamond notifications via NapCat
 
 ## Local Script (Windows)
 
 - Script path: `01_scripts/import http.py`
 - Default port: `8000`
-- Use with Shadowrocket `script-path`:
+- Shadowrocket `script-path` example:
   - `http://<your-local-ip>:8000/upload.js`
-
-## Local Automation
-
-- Scheduled auto-commit script: `auto_commit.ps1` (invoked by `auto_commit.bat`)
-- Auto-commit tracked paths include `tests/` so newly added unit tests can be committed by task automation.
-- Auto-commit tracked paths include both root READMEs: `README.md` and `README.zh-CN.md`.
 
 ## Docker Receiver (Dev)
 
@@ -32,18 +26,12 @@ This repository contains local and dockerized receivers for:
 Build:
 
 ```bash
-docker build -t pjsk-receiver:dev3939 .
+docker build -t pjsk-receiver:latest .
 ```
 
 Run (example):
 
 ```bash
-# Prerequisites:
-# 1) Receiver and NapCat must be in the same user-defined Docker network.
-# 2) Keep placeholders in docs; fill real IDs/tokens only in your own environment.
-# Create network if needed:
-# docker network create <YOUR_DOCKER_NETWORK>
-
 docker run -d \
   --name pjsk-receiver-dev \
   --network <YOUR_DOCKER_NETWORK> \
@@ -75,33 +63,21 @@ docker run -d \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
-  pjsk-receiver:dev3939
+  pjsk-receiver:latest
 ```
 
 Optional:
-- place `mysekai_resource_map.json` at `/opt/pjsk-config/mysekai_resource_map.json`
-- this is used to improve id/name/icon mapping for Mysekai render output
+- place `mysekai_resource_map.json` in the proper config path to improve icon mapping accuracy
 
 Data output:
 - raw payloads: `/data/raw_api/...`
-- decoded json: `/data/decoded_api/...`
-- mysekai rendered maps: `/data/decoded_api/mysekai/maps/...`
+- decoded JSON: `/data/decoded_api/...`
+- Mysekai maps: `/data/decoded_api/mysekai/maps/...`
 - logs: `/data/logs/receiver.log`
 - notification hits: `/data/notifications/hits/`
 - notification events: `/data/notifications/diamond_notifications.jsonl`
 
-Quick checks after start:
-
-```bash
-docker logs -n 80 pjsk-receiver-dev
-docker exec -it pjsk-receiver-dev python -m pip show sssekai
-docker exec -it pjsk-receiver-dev python -m sssekai -h
-curl -sS http://127.0.0.1:3939/healthz
-```
-
-## Virtual Diamond Alert Test
-
-Run inside server to trigger test notification without entering game:
+## Virtual Diamond Notification Test
 
 ```bash
 docker exec -i pjsk-receiver-dev python - <<'PY'
@@ -134,136 +110,37 @@ print("triggered:", os.path.exists(test_path), test_path)
 PY
 ```
 
-Notes:
-- `BOT_TOKEN` is the NapCat HTTP server token (used as `Authorization: Bearer <token>`).
-- If `BOT_PUSH_URL` uses a container name (for example `http://napcat:3000`), ensure both containers are attached to the same Docker network.
-- Set `TZ=Asia/Shanghai` for the receiver container. Dedup windows (`05:00` / `17:00`) use container local time.
-
-## Unit Tests
-
-Run unit tests from repository root:
-
-```bash
-python -m unittest discover -s tests -p "test_*.py" -v
-```
-
-Current test coverage scope:
-- API type detection (`extract_api_type`)
-- Diamond hit extraction (`find_diamond_hits`)
-- Refresh window boundary logic (`get_refresh_window_id`)
-- Current window dedup behavior (`filter_hits_for_current_window`)
-
-## NapCat API baseline (v4.17.48)
-
-Use these interfaces and message structures for text/image push:
-
-- Actions:
-  - `POST {BOT_PUSH_URL}/send_private_msg`
-  - `POST {BOT_PUSH_URL}/send_group_msg`
-- `message` supports both `string` and `array` (message segments).
-- OneBot image segment:
-  - `{"type":"image","data":{"file":"<path|url|base64>"}}`
-- Text + image example:
-
-```json
-[
-  {"type":"text","data":{"text":"diamond hit"}},
-  {"type":"image","data":{"file":"https://example.com/map.png"}}
-]
-```
-
 ## End-to-End Checklist (Capture -> Decode -> NapCat Push)
-
-Use this checklist when you want the complete pipeline to work on a server.
 
 ### 1) Server / Network
 
-- Open server security-group/firewall TCP port `3939`.
-- Prepare persistent host directory (example): `/opt/pjsk-captures`.
-- Ensure receiver and NapCat containers are in the same Docker network.
+- Open security group / firewall TCP `3939`
+- Prepare persistent directory (example: `/opt/pjsk-captures`)
+- Ensure receiver and NapCat are in the same Docker network
 
-### 2) Deploy receiver container
+### 2) Deploy Receiver
 
-- Build image from `04_artifacts/docker_receiver_3939_dev`.
-- The image copies runtime code from `dockerScripts/` into `/app/dockerScripts`.
-- Run with:
+- Build image from `04_artifacts/docker_receiver_3939_dev`
+- Runtime code is copied from `dockerScripts/` to `/app/dockerScripts`
+- Run with at least:
   - `-p 3939:3939`
   - `-v /opt/pjsk-captures:/data`
   - `-e PUBLIC_HOST=<YOUR_SERVER_PUBLIC_IP_OR_DOMAIN>`
-  - NapCat push envs (`BOT_PUSH_*`, `BOT_TOKEN`) if notification is enabled.
+  - if notifications are enabled, configure `BOT_PUSH_*` and `BOT_TOKEN`
 
 ### 3) Configure NapCat HTTP API
 
-- In NapCat WebUI, enable one HTTP server endpoint (normally `0.0.0.0:3000`).
-- Keep/record the HTTP token and pass it to receiver via `BOT_TOKEN`.
+- Enable one HTTP server endpoint in NapCat WebUI (typically `0.0.0.0:3000`)
+- Pass the HTTP token to receiver via `BOT_TOKEN`
 - Verify from receiver container:
-  - `curl`/request to `http://napcat:3000` is reachable in the same Docker network.
-  - Unauthorized (`401/403`) means connectivity is OK but token is missing/wrong.
+  - `http://napcat:3000` is reachable
+  - `401/403` usually means connectivity is fine but token is missing/wrong
 
-### 4) Configure Shadowrocket module
+### 4) Configure Shadowrocket Module
 
-- `script-path` must point to:
+- `script-path`:
   - `http://<PUBLIC_HOST>:3939/upload.js`
-- `pattern` must match real game endpoints you need:
-  - `suite` endpoint(s)
-  - `mysekai` endpoint(s), especially full packet URL:
+- `pattern` should match required endpoints:
+  - `suite`
+  - `mysekai`:
     - `/api/user/<uid>/mysekai?isForceAllReloadOnlyMysekai=True|False`
-- `hostname` in `[Mitm]` must include all related game domains.
-- Install and trust mitm certificate on iOS, and enable MITM for the module.
-
-### 5) Trigger and verify data capture
-
-- Enter game and trigger target APIs:
-  - login flow for user/suite data
-  - enter Mysekai for Mysekai data
-- Check receiver logs:
-  - `Saved [SUITE]` / `Saved [MYSEKAI]`
-  - `Decoded JSON: ...`
-- Check files:
-  - `/opt/pjsk-captures/raw_api/...`
-  - `/opt/pjsk-captures/decoded_api/...`
-
-### 6) Verify push path
-
-- Use virtual test (section `Virtual Diamond Alert Test`) to send a synthetic `id=12` packet.
-- Expected:
-  - `/data/notifications/hits/*.json` created
-  - `/data/notifications/diamond_notifications.jsonl` appended
-  - NapCat sends message to configured private QQ or group target.
-
-### 7) Runtime behavior (current implementation)
-
-- Diamond notification source: decoded **full** Mysekai packet containing `mysekai_material:12`.
-- Map render trigger: only when notification condition is met (id=12 + dedup pass in current window).
-- Render output: one map image per hit site; only hit sites are rendered/sent; no multi-map merge.
-- Dedup logic is window-based:
-  - refresh windows at local `05:00` and `17:00`
-  - same point in same window is not pushed repeatedly
-  - dedup cache persisted at `/data/notifications/notification_dedup_cache.json`
-- Push payload:
-  - default `BOT_MESSAGE_MODE=text+image`
-  - image push failure falls back to text push
-- Render visibility tuning:
-  - `MYSEKAI_MAP_IMAGE_SIZE` controls output size
-  - `MYSEKAI_ICON_SIZE` controls icon size
-  - `MYSEKAI_COUNT_FONT_SIZE` controls quantity text size
-  - `MYSEKAI_ICON_SPREAD` controls multi-icon spacing at same point
-  - site-level fine tuning is supported via env vars:
-    - `SITE<id>_OFFSET_X_DELTA`, `SITE<id>_OFFSET_Z_DELTA`
-    - `SITE<id>_SCALE_X_DELTA`, `SITE<id>_SCALE_Z_DELTA`
-  - current default calibration lifts site 6 (beach) overlays by about 12.5% vertically for better alignment
-- Retention:
-  - raw/decoded/cards keep latest `RETENTION_COUNT`
-  - notification hit files keep `NOTIFICATION_HIT_RETENTION`
-  - notification events jsonl keep latest `NOTIFICATION_EVENT_RETENTION_LINES` lines
-
-### 8) Common failure points
-
-- Only `GET /upload.js` appears, but no `POST /upload`:
-  - module `pattern` not matched or script not attached to response.
-- Game hangs on Mysekai:
-  - over-aggressive rewrite/redirect rules; reduce to script capture only.
-- Push fails `Connection refused`:
-  - receiver cannot reach NapCat host/port in Docker network.
-- Push fails `401/403`:
-  - token mismatch; recheck `BOT_TOKEN` and NapCat HTTP server token.
