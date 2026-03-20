@@ -3,8 +3,9 @@
 ## 0. Current status
 - Recent updates:
   - 2026-03-18: tuned Mysekai beach map (siteId=6) overlay vertical alignment by lifting render placement ~12.5% for better icon-to-map fit.
+  - 2026-03-19: added unit tests for receiver core logic (`extract_api_type`, `find_diamond_hits`, `get_refresh_window_id`, `filter_hits_for_current_window`) under `tests/`.
 - Current priority:
-  - Verify site-level render alignment on production captures and, if needed, expose per-site offset defaults in docs/examples.
+  - Implement strict "first hit only per window" dedup (current dedup is point-based within window).
 - [x] Capture `suite` / `mysekai` responses
 - [x] Decode API payloads
 - [x] Render suite card image

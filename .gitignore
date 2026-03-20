@@ -18,6 +18,8 @@ AGENTS.md
 !00_docs/**
 !01_scripts/
 !01_scripts/**
+!tests/
+!tests/**
 !04_artifacts/
 !04_artifacts/**
 

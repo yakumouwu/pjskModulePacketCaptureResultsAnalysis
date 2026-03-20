@@ -132,6 +132,20 @@ Notes:
 - If `BOT_PUSH_URL` uses a container name (for example `http://napcat:3000`), ensure both containers are attached to the same Docker network.
 - Set `TZ=Asia/Shanghai` for the receiver container. Dedup windows (`05:00` / `17:00`) use container local time.
 
+## Unit Tests
+
+Run unit tests from repository root:
+
+```bash
+python -m unittest discover -s tests -p "test_*.py" -v
+```
+
+Current test coverage scope:
+- API type detection (`extract_api_type`)
+- Diamond hit extraction (`find_diamond_hits`)
+- Refresh window boundary logic (`get_refresh_window_id`)
+- Current window dedup behavior (`filter_hits_for_current_window`)
+
 ## NapCat API baseline (v4.17.48)
 
 Use these interfaces and message structures for text/image push:
