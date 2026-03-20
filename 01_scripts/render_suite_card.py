@@ -124,7 +124,13 @@ def render_suite_card(json_path: str, output_path: str) -> List[str]:
     d = ImageDraw.Draw(img)
 
     # Background accents
-    d.rounded_rectangle((24, 24, w - 24, h - 24), radius=28, fill=(255, 255, 255), outline=(220, 230, 240), width=2)
+    d.rounded_rectangle(
+        (24, 24, w - 24, h - 24),
+        radius=28,
+        fill=(255, 255, 255),
+        outline=(220, 230, 240),
+        width=2,
+    )
     d.ellipse((1000, -150, 1550, 400), fill=(231, 248, 255))
     d.ellipse((-150, 650, 350, 1100), fill=(239, 249, 255))
 
@@ -144,21 +150,32 @@ def render_suite_card(json_path: str, output_path: str) -> List[str]:
 
     # Right summary chips
     d.rounded_rectangle((860, 60, 1410, 120), radius=28, fill=(42, 197, 191))
-    d.text((1065, 75), "MULTI LIVE", font=_load_font(34, bold=True), fill=(255, 255, 255))
+    d.text(
+        (1065, 75), "MULTI LIVE", font=_load_font(34, bold=True), fill=(255, 255, 255)
+    )
     d.rounded_rectangle((880, 145, 1130, 208), radius=28, fill=(54, 201, 196))
     d.text((900, 162), f"MVP  {stats['mvp_total']}", font=font_h2, fill=(255, 255, 255))
     d.rounded_rectangle((1150, 145, 1410, 208), radius=28, fill=(54, 201, 196))
-    d.text((1173, 162), f"SUPER  {stats['superstar_total']}", font=font_h2, fill=(255, 255, 255))
+    d.text(
+        (1173, 162),
+        f"SUPER  {stats['superstar_total']}",
+        font=font_h2,
+        fill=(255, 255, 255),
+    )
 
     d.rounded_rectangle((860, 240, 1410, 300), radius=28, fill=(42, 197, 191))
-    d.text((1030, 255), "CHALLENGE", font=_load_font(34, bold=True), fill=(255, 255, 255))
+    d.text(
+        (1030, 255), "CHALLENGE", font=_load_font(34, bold=True), fill=(255, 255, 255)
+    )
     d.rounded_rectangle((880, 322, 1410, 390), radius=30, fill=(232, 246, 255))
     d.text((900, 340), "SOLO BEST", font=font_h2, fill=(66, 126, 170))
     d.text((1180, 336), f"{stats['challenge_best']}", font=font_num, fill=(22, 34, 52))
 
     # Difficulty rows
     section_y = 310
-    for idx, (label, key) in enumerate([("CLEAR", "clear"), ("FULL COMBO", "fc"), ("ALL PERFECT", "ap")]):
+    for idx, (label, key) in enumerate(
+        [("CLEAR", "clear"), ("FULL COMBO", "fc"), ("ALL PERFECT", "ap")]
+    ):
         y0 = section_y + idx * 155
         d.rounded_rectangle((60, y0, 790, y0 + 48), radius=24, fill=(42, 197, 191))
         d.text((355, y0 + 8), label, font=font_h2, fill=(255, 255, 255))
@@ -166,14 +183,24 @@ def render_suite_card(json_path: str, output_path: str) -> List[str]:
         for diff in DIFF_ORDER:
             color = DIFF_COLOR[diff]
             d.rounded_rectangle((x, y0 + 65, x + 110, y0 + 102), radius=12, fill=color)
-            d.text((x + 12, y0 + 72), diff.upper(), font=_load_font(18, bold=True), fill=(255, 255, 255))
+            d.text(
+                (x + 12, y0 + 72),
+                diff.upper(),
+                font=_load_font(18, bold=True),
+                fill=(255, 255, 255),
+            )
             val = stats[key].get(diff, 0)
             d.text((x + 34, y0 + 108), str(val), font=font_num, fill=(20, 30, 45))
             x += 118
 
     # Character rank area
     d.rounded_rectangle((860, 430, 1410, 490), radius=28, fill=(42, 197, 191))
-    d.text((985, 445), "CHARACTER RANK", font=_load_font(34, bold=True), fill=(255, 255, 255))
+    d.text(
+        (985, 445),
+        "CHARACTER RANK",
+        font=_load_font(34, bold=True),
+        fill=(255, 255, 255),
+    )
 
     gx, gy = 875, 510
     cell_w, cell_h = 255, 78
@@ -182,18 +209,52 @@ def render_suite_card(json_path: str, output_path: str) -> List[str]:
         col = i % 2
         x0 = gx + col * (cell_w + 20)
         y0 = gy + row * (cell_h + 14)
-        d.rounded_rectangle((x0, y0, x0 + cell_w, y0 + cell_h), radius=34, fill=(104, 202, 242))
+        d.rounded_rectangle(
+            (x0, y0, x0 + cell_w, y0 + cell_h), radius=34, fill=(104, 202, 242)
+        )
         d.ellipse((x0 + 10, y0 + 10, x0 + 58, y0 + 58), fill=(219, 244, 255))
-        d.text((x0 + 20, y0 + 20), str(cid), font=_load_font(18, bold=True), fill=(43, 121, 163))
-        d.text((x0 + 86, y0 + 18), f"Rank {crank}", font=_load_font(30, bold=True), fill=(12, 27, 43))
+        d.text(
+            (x0 + 20, y0 + 20),
+            str(cid),
+            font=_load_font(18, bold=True),
+            fill=(43, 121, 163),
+        )
+        d.text(
+            (x0 + 86, y0 + 18),
+            f"Rank {crank}",
+            font=_load_font(30, bold=True),
+            fill=(12, 27, 43),
+        )
 
     # Missing data notice
     if missing:
-        d.rounded_rectangle((60, 805, 790, 860), radius=12, fill=(255, 243, 227), outline=(236, 173, 89), width=2)
-        d.text((74, 820), "Missing fields: " + ", ".join(missing[:6]), font=_load_font(20), fill=(156, 93, 20))
+        d.rounded_rectangle(
+            (60, 805, 790, 860),
+            radius=12,
+            fill=(255, 243, 227),
+            outline=(236, 173, 89),
+            width=2,
+        )
+        d.text(
+            (74, 820),
+            "Missing fields: " + ", ".join(missing[:6]),
+            font=_load_font(20),
+            fill=(156, 93, 20),
+        )
     else:
-        d.rounded_rectangle((60, 805, 420, 860), radius=12, fill=(230, 250, 239), outline=(86, 188, 121), width=2)
-        d.text((74, 820), "Data completeness: OK", font=_load_font(22, bold=True), fill=(38, 125, 68))
+        d.rounded_rectangle(
+            (60, 805, 420, 860),
+            radius=12,
+            fill=(230, 250, 239),
+            outline=(86, 188, 121),
+            width=2,
+        )
+        d.text(
+            (74, 820),
+            "Data completeness: OK",
+            font=_load_font(22, bold=True),
+            fill=(38, 125, 68),
+        )
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     img.save(output_path)
@@ -203,7 +264,9 @@ def render_suite_card(json_path: str, output_path: str) -> List[str]:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Render suite card image from suite json")
+    parser = argparse.ArgumentParser(
+        description="Render suite card image from suite json"
+    )
     parser.add_argument("infile", help="suite json file")
     parser.add_argument("outfile", help="output png path")
     args = parser.parse_args()

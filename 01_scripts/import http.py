@@ -7,23 +7,25 @@ import sys
 from datetime import datetime
 
 PORT = 8000
-LOCAL_IP = '127.0.0.1'
+LOCAL_IP = "127.0.0.1"
 REGION = "cn"
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 RAW_BASE_DIR = os.path.join(ROOT_DIR, "02_captures", "raw_api")
 DECODED_BASE_DIR = os.path.join(ROOT_DIR, "02_captures", "decoded_api")
 
+
 def extract_api_type(url):
     # Match /mysekai, /mysekai/, /mysekai/xxx and optional query string
-    if re.search(r'/mysekai(?:/|\?|$)', url):
-        return 'mysekai'
-    if re.search(r'/suite/', url):
-        return 'suite'
-    return 'unknown'
+    if re.search(r"/mysekai(?:/|\?|$)", url):
+        return "mysekai"
+    if re.search(r"/suite/", url):
+        return "suite"
+    return "unknown"
+
 
 def generate_filename(api_type, original_url):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    user_id = re.search(r'/user/(\d+)', original_url)
+    user_id = re.search(r"/user/(\d+)", original_url)
     user_str = f"_user{user_id.group(1)}" if user_id else ""
     return f"{api_type}{user_str}_{timestamp}_{os.getpid()}.bin"
 
@@ -82,9 +84,10 @@ def render_suite_card_if_possible(json_path, decoded_dir):
         return card_path, "ok"
     return None, (proc.stderr or proc.stdout or "render_failed").strip()
 
+
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
-        if self.path == '/upload.js':
+        if self.path == "/upload.js":
             js_content = """
             const upload = () => {
                 $httpClient.post({
@@ -97,43 +100,50 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 }, (error) => $done({}));
             };
             upload();
-            """ % (LOCAL_IP, PORT)
+            """ % (
+                LOCAL_IP,
+                PORT,
+            )
 
             js_content = js_content.strip()
             self.send_response(200)
-            self.send_header('Content-Type', 'application/javascript; charset=utf-8')
-            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
-            self.send_header('Pragma', 'no-cache')
-            self.send_header('Expires', '0')
-            self.send_header('Content-Length', str(len(js_content.encode('utf-8'))))
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
+            self.send_header("Content-Length", str(len(js_content.encode("utf-8"))))
             self.end_headers()
-            self.wfile.write(js_content.encode('utf-8'))
+            self.wfile.write(js_content.encode("utf-8"))
             return
 
         self.send_response(404)
         self.end_headers()
 
     def do_POST(self):
-        original_url = self.headers.get('X-Original-Url', '')
+        original_url = self.headers.get("X-Original-Url", "")
         api_type = extract_api_type(original_url)
         filename = generate_filename(api_type, original_url)
-        content_length = int(self.headers['Content-Length'])
+        content_length = int(self.headers["Content-Length"])
         received_data = self.rfile.read(content_length)
         raw_dir, decoded_dir = ensure_capture_dirs(api_type)
         raw_path = os.path.join(raw_dir, filename)
 
-        with open(raw_path, 'wb') as f:
+        with open(raw_path, "wb") as f:
             f.write(received_data)
 
         print(f"Saved [{api_type.upper()}]: {raw_path}")
-        print(f"Source URL: {original_url[:100]}{'...' if len(original_url) > 100 else ''}")
+        print(
+            f"Source URL: {original_url[:100]}{'...' if len(original_url) > 100 else ''}"
+        )
         print(f"File Size: {len(received_data)/1024:.2f} KB")
 
         json_path, status = auto_decrypt_if_supported(api_type, raw_path, decoded_dir)
         if status == "ok":
             print(f"Decoded JSON: {json_path}\n")
             if api_type == "suite":
-                card_path, cstatus = render_suite_card_if_possible(json_path, decoded_dir)
+                card_path, cstatus = render_suite_card_if_possible(
+                    json_path, decoded_dir
+                )
                 if cstatus == "ok":
                     print(f"Suite Card: {card_path}\n")
                 else:
@@ -146,8 +156,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             print(f"Decode failed: {status}\n")
 
         self.send_response(200)
-        self.send_header('Content-Type', 'text/plain; charset=utf-8')
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.end_headers()
+
 
 if __name__ == "__main__":
     print(f"Universal Data Receiver running at http://0.0.0.0:{PORT}")

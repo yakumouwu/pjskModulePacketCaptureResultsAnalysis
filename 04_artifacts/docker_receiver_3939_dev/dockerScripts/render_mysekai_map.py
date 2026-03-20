@@ -7,11 +7,35 @@ from collections import OrderedDict
 from PIL import Image, ImageDraw, ImageFont
 
 SITE_CONFIG = {
-    5: {"name": "Map 1", "bg": "grassland.png", "transform": "zx_neg", "scale_add": (8.5, 8.5), "offset_add": (30.0, 0.0)},
+    5: {
+        "name": "Map 1",
+        "bg": "grassland.png",
+        "transform": "zx_neg",
+        "scale_add": (8.5, 8.5),
+        "offset_add": (30.0, 0.0),
+    },
     # Beach map: lift all overlays by ~12.5% of 1080p background height (~135px).
-    6: {"name": "Map 2", "bg": "beach.png", "transform": "x_negz", "scale_add": (4.6, 4.2), "offset_add": (-70.0, -50.0)},
-    7: {"name": "Map 3", "bg": "flowergarden.png", "transform": "zx_neg", "scale_add": (5.0, 3.0), "offset_add": (55.0, -70.0)},
-    8: {"name": "Map 4", "bg": "memorialplace.png", "transform": "x_negz", "scale_add": (3.0, 0.0), "offset_add": (-185.0, 35.0)},
+    6: {
+        "name": "Map 2",
+        "bg": "beach.png",
+        "transform": "x_negz",
+        "scale_add": (4.6, 4.2),
+        "offset_add": (-70.0, -50.0),
+    },
+    7: {
+        "name": "Map 3",
+        "bg": "flowergarden.png",
+        "transform": "zx_neg",
+        "scale_add": (5.0, 3.0),
+        "offset_add": (55.0, -70.0),
+    },
+    8: {
+        "name": "Map 4",
+        "bg": "memorialplace.png",
+        "transform": "x_negz",
+        "scale_add": (3.0, 0.0),
+        "offset_add": (-185.0, 35.0),
+    },
 }
 
 ASSET_ICON_TO_FILE = {
@@ -109,7 +133,11 @@ def _find_map_json():
 
     here = os.path.dirname(__file__)
     candidates = [
-        os.path.abspath(os.path.join(here, "..", "..", "..", "01_scripts", "mysekai_resource_map.json")),
+        os.path.abspath(
+            os.path.join(
+                here, "..", "..", "..", "01_scripts", "mysekai_resource_map.json"
+            )
+        ),
     ]
     for p in candidates:
         if os.path.isfile(p):
@@ -181,7 +209,11 @@ def _extract_points(mysekai_json):
         coords = points_by_site.setdefault(site_id, {})
         for drop in hm.get("userMysekaiSiteHarvestResourceDrops", []):
             resource_type = str(drop.get("resourceType", ""))
-            if resource_type not in ("mysekai_material", "mysekai_item", "mysekai_music_record"):
+            if resource_type not in (
+                "mysekai_material",
+                "mysekai_item",
+                "mysekai_music_record",
+            ):
                 continue
             x = drop.get("positionX")
             z = drop.get("positionZ")
@@ -190,11 +222,13 @@ def _extract_points(mysekai_json):
             rx, rz = _transform(site_id, float(x), float(z))
             k = (rx, rz)
             lst = coords.setdefault(k, [])
-            lst.append({
-                "resourceType": resource_type,
-                "resourceId": int(drop.get("resourceId", -1)),
-                "qty": int(drop.get("quantity", 1)),
-            })
+            lst.append(
+                {
+                    "resourceType": resource_type,
+                    "resourceId": int(drop.get("resourceId", -1)),
+                    "qty": int(drop.get("quantity", 1)),
+                }
+            )
     return points_by_site
 
 
@@ -264,9 +298,15 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
             icon = icons.get(main_key)
             if icon is not None:
                 icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
-                img.paste(icon_img, (px - icon_size // 2, py - icon_size // 2), icon_img)
+                img.paste(
+                    icon_img, (px - icon_size // 2, py - icon_size // 2), icon_img
+                )
             else:
-                draw.ellipse([px - 8, py - 8, px + 8, py + 8], fill=(120, 120, 120, 90), outline=(220, 220, 220, 180))
+                draw.ellipse(
+                    [px - 8, py - 8, px + 8, py + 8],
+                    fill=(120, 120, 120, 90),
+                    outline=(220, 220, 220, 180),
+                )
             text = str(main_qty)
             tx = px + (icon_size // 2) - 2
             ty = py + (icon_size // 3)
@@ -281,9 +321,15 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
                 icon = icons.get(key)
                 if icon is not None:
                     icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
-                    img.paste(icon_img, (ix - icon_size // 2, iy - icon_size // 2), icon_img)
+                    img.paste(
+                        icon_img, (ix - icon_size // 2, iy - icon_size // 2), icon_img
+                    )
                 else:
-                    draw.ellipse([ix - 6, iy - 6, ix + 6, iy + 6], fill=(120, 120, 120, 90), outline=(220, 220, 220, 180))
+                    draw.ellipse(
+                        [ix - 6, iy - 6, ix + 6, iy + 6],
+                        fill=(120, 120, 120, 90),
+                        outline=(220, 220, 220, 180),
+                    )
                 text = str(qty)
                 tx = ix + (icon_size // 2) - 2
                 ty = iy + (icon_size // 3)
@@ -296,7 +342,9 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
     return panel, "ok"
 
 
-def render_single_site_image(json_path, out_path, assets_dir, site_id, target_size=1024):
+def render_single_site_image(
+    json_path, out_path, assets_dir, site_id, target_size=1024
+):
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     points_by_site = _extract_points(data)
@@ -327,8 +375,15 @@ def render_mysekai_map_image(json_path, out_path, assets_dir):
 
     grid = Image.new("RGBA", (target * 2, target * 2 + 48), (18, 22, 30, 255))
     title = ImageDraw.Draw(grid)
-    title.text((16, 10), "MySekai Resource Map", fill=(240, 240, 245), font=_get_font(20))
-    panel_pos = {5: (0, 48), 7: (target, 48), 6: (0, target + 48), 8: (target, target + 48)}
+    title.text(
+        (16, 10), "MySekai Resource Map", fill=(240, 240, 245), font=_get_font(20)
+    )
+    panel_pos = {
+        5: (0, 48),
+        7: (target, 48),
+        6: (0, target + 48),
+        8: (target, target + 48),
+    }
     for sid, pos in panel_pos.items():
         if sid in rendered:
             grid.paste(rendered[sid], pos, rendered[sid])
@@ -348,7 +403,9 @@ if __name__ == "__main__":
     args = ap.parse_args()
 
     if args.site_id is None:
-        ok, msg = render_mysekai_map_image(args.json_path, args.out_path, args.assets_dir)
+        ok, msg = render_mysekai_map_image(
+            args.json_path, args.out_path, args.assets_dir
+        )
     else:
         ok, msg = render_single_site_image(
             args.json_path,

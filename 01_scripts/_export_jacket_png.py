@@ -16,11 +16,13 @@ UnityPy.config.FALLBACK_UNITY_VERSION = "2022.3.21f1"
 
 safe = re.compile(r"[^0-9A-Za-z._-]+")
 
+
 def norm(name: str) -> str:
     name = (name or "").strip()
     name = safe.sub("_", name)
     name = name.strip("._")
     return name or "noname"
+
 
 bundles = sorted([p for p in SRC_DIR.rglob("*") if p.is_file()])
 
@@ -32,7 +34,7 @@ stats = {
     "exported_png": 0,
     "bundle_with_texture": 0,
     "errors_count": 0,
-    "errors_sample": []
+    "errors_sample": [],
 }
 
 for b in bundles:
@@ -41,7 +43,9 @@ for b in bundles:
     except Exception as e:
         stats["errors_count"] += 1
         if len(stats["errors_sample"]) < 20:
-            stats["errors_sample"].append({"bundle": str(b), "error": f"load_failed: {e}"})
+            stats["errors_sample"].append(
+                {"bundle": str(b), "error": f"load_failed: {e}"}
+            )
         continue
 
     exported_this_bundle = 0
@@ -67,11 +71,12 @@ for b in bundles:
         except Exception as e:
             stats["errors_count"] += 1
             if len(stats["errors_sample"]) < 20:
-                stats["errors_sample"].append({"bundle": str(b), "error": f"texture_failed: {e}"})
+                stats["errors_sample"].append(
+                    {"bundle": str(b), "error": f"texture_failed: {e}"}
+                )
 
     if exported_this_bundle > 0:
         stats["bundle_with_texture"] += 1
 
 REPORT.write_text(json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8")
 print(json.dumps(stats, ensure_ascii=False))
-

@@ -4,6 +4,7 @@
 # Keep this file itself.
 !.gitignore
 !README.md
+!README.zh-CN.md
 !batchAnalysis.bat
 AGENTS.md
 
@@ -18,10 +19,16 @@ AGENTS.md
 !00_docs/**
 !01_scripts/
 !01_scripts/**
+!tests/
+!tests/**
 !04_artifacts/
 !04_artifacts/**
 
+# Keep TODO local only.
+00_docs/TODO.md
+
 # Ignore generated artifacts inside whitelisted paths.
 01_scripts/**/__pycache__/
+tests/**/__pycache__/
 04_artifacts/**/__pycache__/
 04_artifacts/**/*.tar

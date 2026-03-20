@@ -1,11 +1,12 @@
 # Mysekai/Suite Receiver Docker (Port 3939)
+[中文](./README_DOCKER.zh-CN.md) | [Project README](../../README.md) | [项目中文总览](../../README.zh-CN.md)
 
 Runtime scripts are stored in `dockerScripts/` and copied into the image as `/app/dockerScripts`.
 
 ## Build
 
 ```bash
-docker build -t pjsk-receiver:3939 .
+docker build -t pjsk-receiver:latest .
 ```
 
 ## Run
@@ -35,25 +36,21 @@ docker run -d \
   -e BOT_TOKEN=<YOUR_NAPCAT_HTTP_TOKEN> \
   -e BOT_PUSH_MODE=<private_or_group> \
   -e BOT_TARGET_ID=<YOUR_QQ_OR_GROUP_ID> \
+  -e NOTIFICATION_USER_LABEL=<YOUR_USER_LABEL> \
   -e BOT_PUSH_RETRY=3 \
   -e BOT_MESSAGE_MODE=text+image \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
   -e MYSEKAI_ICON_SPREAD=22 \
-  -e ALERT_WINDOW_CACHE_HOURS=72 \
-  -e ALERT_HIT_RETENTION=100 \
-  -e ALERT_EVENT_RETENTION_LINES=5000 \
+  -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
+  -e NOTIFICATION_HIT_RETENTION=100 \
+  -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
-  pjsk-receiver:3939
+  pjsk-receiver:latest
 ```
-
-Optional config file:
-- put `mysekai_resource_map.json` at `/opt/pjsk-config/mysekai_resource_map.json`
-- this improves material-id/icon mapping consistency across environments
-- set `TZ=Asia/Shanghai`; dedup windows (`05:00` / `17:00`) use container local time
 
 Quick checks after start:
 
@@ -70,7 +67,7 @@ curl -sS http://127.0.0.1:3939/healthz
 - decoded json: /data/decoded_api/suite or /data/decoded_api/mysekai
 - mysekai rendered maps: /data/decoded_api/mysekai/maps
 - service logs (rolling): /data/logs/receiver.log
-- diamond alert trigger: decoded mysekai full packet contains `mysekai_material:12`
+- diamond notification trigger: decoded mysekai full packet contains `mysekai_material:12`
 - render trigger: only when id=12 hit passes dedup in current time window
 - render output: one image per hit site; only hit sites are generated/sent
 - render tuning:
@@ -82,8 +79,8 @@ curl -sS http://127.0.0.1:3939/healthz
     - `SITE<id>_OFFSET_X_DELTA`, `SITE<id>_OFFSET_Z_DELTA`
     - `SITE<id>_SCALE_X_DELTA`, `SITE<id>_SCALE_Z_DELTA`
   - current default calibration lifts site 6 (beach) overlays by about 12.5% vertically
-- diamond hit archives: /data/alerts/hits/
-- diamond alert events: /data/alerts/diamond_events.jsonl
+- diamond hit archives: /data/notifications/hits/
+- diamond notification events: /data/notifications/diamond_notifications.jsonl
 - health check endpoint: GET /healthz
 - `BOT_TOKEN` is the NapCat HTTP server token (Authorization Bearer token)
 
