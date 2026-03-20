@@ -26,5 +26,6 @@ AGENTS.md
 
 # Ignore generated artifacts inside whitelisted paths.
 01_scripts/**/__pycache__/
+tests/**/__pycache__/
 04_artifacts/**/__pycache__/
 04_artifacts/**/*.tar
