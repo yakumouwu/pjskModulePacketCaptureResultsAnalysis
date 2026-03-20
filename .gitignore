@@ -4,6 +4,7 @@
 # Keep this file itself.
 !.gitignore
 !README.md
+!README.zh-CN.md
 !batchAnalysis.bat
 AGENTS.md
 

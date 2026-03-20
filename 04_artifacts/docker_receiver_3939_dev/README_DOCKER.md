@@ -1,4 +1,5 @@
 # Mysekai/Suite Receiver Docker (Port 3939)
+[中文](./README_DOCKER.zh-CN.md) | [Project README](../../README.md) | [项目中文总览](../../README.zh-CN.md)
 
 Runtime scripts are stored in `dockerScripts/` and copied into the image as `/app/dockerScripts`.
 
