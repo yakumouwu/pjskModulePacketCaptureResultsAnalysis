@@ -41,8 +41,12 @@ BOT_MESSAGE_MODE = os.environ.get("BOT_MESSAGE_MODE", "text+image").strip().lowe
 MYSEKAI_MAP_IMAGE_SIZE = int(os.environ.get("MYSEKAI_MAP_IMAGE_SIZE", "1024"))
 
 NOTIFICATION_HIT_RETENTION = int(os.environ.get("NOTIFICATION_HIT_RETENTION", "100"))
-NOTIFICATION_EVENT_RETENTION_LINES = int(os.environ.get("NOTIFICATION_EVENT_RETENTION_LINES", "5000"))
-NOTIFICATION_WINDOW_CACHE_HOURS = int(os.environ.get("NOTIFICATION_WINDOW_CACHE_HOURS", "72"))
+NOTIFICATION_EVENT_RETENTION_LINES = int(
+    os.environ.get("NOTIFICATION_EVENT_RETENTION_LINES", "5000")
+)
+NOTIFICATION_WINDOW_CACHE_HOURS = int(
+    os.environ.get("NOTIFICATION_WINDOW_CACHE_HOURS", "72")
+)
 
 REQUEST_COUNTER = count(1)
 NOTIFICATION_DEDUP_CACHE = {}
@@ -82,7 +86,9 @@ def ensure_output_dirs(api_type):
 
 
 def prune_old_files(directory, pattern, keep_count):
-    paths = sorted(Path(directory).glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
+    paths = sorted(
+        Path(directory).glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True
+    )
     for old in paths[keep_count:]:
         try:
             old.unlink()
@@ -101,7 +107,9 @@ def setup_logging():
 
     sh = logging.StreamHandler(sys.stdout)
     sh.setFormatter(fmt)
-    fh = RotatingFileHandler(log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8")
+    fh = RotatingFileHandler(
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+    )
     fh.setFormatter(fmt)
 
     root.addHandler(sh)
@@ -143,7 +151,11 @@ def save_dedup_cache():
 def cleanup_window_dedup_cache():
     now_ts = time.time()
     max_age_seconds = max(1, NOTIFICATION_WINDOW_CACHE_HOURS) * 3600
-    expired = [k for k, ts in NOTIFICATION_DEDUP_CACHE.items() if now_ts - float(ts) > max_age_seconds]
+    expired = [
+        k
+        for k, ts in NOTIFICATION_DEDUP_CACHE.items()
+        if now_ts - float(ts) > max_age_seconds
+    ]
     for k in expired:
         NOTIFICATION_DEDUP_CACHE.pop(k, None)
     if expired:
@@ -178,7 +190,9 @@ def prune_event_file(event_file, keep_lines):
 def decrypt_bin(api_type, raw_path, decoded_dir):
     if api_type not in ("suite", "mysekai"):
         return None, "skipped"
-    out_json = os.path.join(decoded_dir, os.path.splitext(os.path.basename(raw_path))[0] + ".json")
+    out_json = os.path.join(
+        decoded_dir, os.path.splitext(os.path.basename(raw_path))[0] + ".json"
+    )
     cmd = [
         sys.executable,
         "-m",
@@ -201,7 +215,9 @@ def render_suite_card(json_path, decoded_dir):
         return None, "renderer_not_found"
     card_dir = os.path.join(decoded_dir, "cards")
     os.makedirs(card_dir, exist_ok=True)
-    card_path = os.path.join(card_dir, os.path.splitext(os.path.basename(json_path))[0] + ".png")
+    card_path = os.path.join(
+        card_dir, os.path.splitext(os.path.basename(json_path))[0] + ".png"
+    )
     cmd = [sys.executable, renderer, json_path, card_path]
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode == 0 and os.path.exists(card_path):
@@ -239,7 +255,9 @@ def render_mysekai_site_maps(json_path, decoded_dir, site_ids):
         if proc.returncode == 0 and os.path.exists(map_path):
             rendered_paths[sid] = map_path
             continue
-        failed.append(f"site={sid}:{(proc.stderr or proc.stdout or 'render_failed').strip()}")
+        failed.append(
+            f"site={sid}:{(proc.stderr or proc.stdout or 'render_failed').strip()}"
+        )
 
     if not rendered_paths:
         return {}, "; ".join(failed) if failed else "render_failed"
@@ -256,7 +274,10 @@ def find_diamond_hits(json_data):
     for hm in json_data.get("updatedResources", {}).get("userMysekaiHarvestMaps", []):
         site_id = hm.get("mysekaiSiteId")
         for drop in hm.get("userMysekaiSiteHarvestResourceDrops", []):
-            if drop.get("resourceType") == "mysekai_material" and int(drop.get("resourceId", -1)) == 12:
+            if (
+                drop.get("resourceType") == "mysekai_material"
+                and int(drop.get("resourceId", -1)) == 12
+            ):
                 qty = int(drop.get("quantity", 0))
                 entry = hits.setdefault(site_id, {"qty": 0, "points": []})
                 entry["qty"] += qty
@@ -365,7 +386,12 @@ def send_bot_message(message):
             return True, body[:300]
         except Exception as e:
             last_err = str(e)
-            logger.warning("Notification push failed (attempt %s/%s): %s", attempt, BOT_PUSH_RETRY, e)
+            logger.warning(
+                "Notification push failed (attempt %s/%s): %s",
+                attempt,
+                BOT_PUSH_RETRY,
+                e,
+            )
             if attempt < BOT_PUSH_RETRY:
                 time.sleep(1.0 * attempt)
     return False, last_err
@@ -425,6 +451,8 @@ def format_hit_text(hits):
         else:
             parts.append(f"{label} diamond x{qty} siteId={sid}")
     return " | ".join(parts)
+
+
 def process_mysekai_notification(out_json, original_url):
     try:
         with open(out_json, "r", encoding="utf-8") as f:
@@ -448,7 +476,9 @@ def process_mysekai_notification(out_json, original_url):
     user_id = user_match.group(1) if user_match else "unknown"
     window_id, hits = filter_hits_for_current_window(user_id, hits)
     if not hits:
-        logger.info("Notification dedup skip: same diamond points in window %s", window_id)
+        logger.info(
+            "Notification dedup skip: same diamond points in window %s", window_id
+        )
         return
 
     hit_text = format_hit_text(hits)
@@ -474,7 +504,9 @@ def process_mysekai_notification(out_json, original_url):
     except Exception as e:
         logger.warning("Notification hit archive failed: %s", e)
 
-    map_paths, map_status = render_mysekai_site_maps(out_json, os.path.dirname(out_json), hits.keys())
+    map_paths, map_status = render_mysekai_site_maps(
+        out_json, os.path.dirname(out_json), hits.keys()
+    )
     if map_status == "ok":
         map_dir = os.path.join(os.path.dirname(out_json), "maps")
         prune_old_files(map_dir, "mysekai_*.png", RETENTION_COUNT)
@@ -488,9 +520,19 @@ def process_mysekai_notification(out_json, original_url):
         image_path = map_paths.get(sid)
         ok, detail_msg = push_text_with_optional_image(message, image_path)
         if ok:
-            logger.info("Notification pushed: site=%s image=%s detail=%s", sid, bool(image_path), detail_msg)
+            logger.info(
+                "Notification pushed: site=%s image=%s detail=%s",
+                sid,
+                bool(image_path),
+                detail_msg,
+            )
         else:
-            logger.warning("Notification push failed: site=%s image=%s detail=%s", sid, bool(image_path), detail_msg)
+            logger.warning(
+                "Notification push failed: site=%s image=%s detail=%s",
+                sid,
+                bool(image_path),
+                detail_msg,
+            )
 
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -515,7 +557,10 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 }, (error) => $done({}));
             };
             upload();
-            """ % (PUBLIC_HOST, PORT)
+            """ % (
+                PUBLIC_HOST,
+                PORT,
+            )
 
             js_content = js_content.strip()
             self.send_response(200)
@@ -545,7 +590,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
         prune_old_files(raw_dir, f"{api_type}_*.bin", RETENTION_COUNT)
         logger.info("Saved [%s]: %s", api_type.upper(), raw_path)
-        logger.info("Source URL: %s%s", original_url[:100], "..." if len(original_url) > 100 else "")
+        logger.info(
+            "Source URL: %s%s",
+            original_url[:100],
+            "..." if len(original_url) > 100 else "",
+        )
         logger.info("File Size: %.2f KB", len(received_data) / 1024)
 
         out_json, dstatus = decrypt_bin(api_type, raw_path, decoded_dir)
@@ -582,7 +631,9 @@ if __name__ == "__main__":
     logger.info("apidecrypt region: %s", REGION)
     logger.info("Retention count per type: %s", RETENTION_COUNT)
     logger.info("Notification hit retention: %s", NOTIFICATION_HIT_RETENTION)
-    logger.info("Notification event retention lines: %s", NOTIFICATION_EVENT_RETENTION_LINES)
+    logger.info(
+        "Notification event retention lines: %s", NOTIFICATION_EVENT_RETENTION_LINES
+    )
     logger.info("Notification window cache hours: %s", NOTIFICATION_WINDOW_CACHE_HOURS)
     logger.info(
         "Bot push: enabled=%s mode=%s target=%s url=%s retry=%s",
@@ -594,12 +645,11 @@ if __name__ == "__main__":
     )
     logger.info("Bot message mode: %s", BOT_MESSAGE_MODE)
     logger.info("Mysekai map image size: %s", MYSEKAI_MAP_IMAGE_SIZE)
-    logger.info("File naming format: [api_type]_[user]_[timestamp]_[ms]_[pid]_[seq].bin")
+    logger.info(
+        "File naming format: [api_type]_[user]_[timestamp]_[ms]_[pid]_[seq].bin"
+    )
     try:
         with socketserver.TCPServer(("", PORT), RequestHandler) as httpd:
             httpd.serve_forever()
     except KeyboardInterrupt:
         logger.info("Server stopped by user")
-
-
-
