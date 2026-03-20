@@ -127,6 +127,13 @@ Current coverage scope:
 - Notification pipeline light integration (`process_mysekai_notification` skip/hit branches)
 - HTTP endpoints (`GET /healthz`, `GET /upload.js`, `GET /`)
 
+## LangBot Placeholder Plugin (Upload Smoke Test)
+
+- Source directory: `04_artifacts/langbot_plugin_placeholder/MysekaiQueryPlaceholder`
+- Upload-ready package:
+- `04_artifacts/langbot_plugin_placeholder/dist/MysekaiQueryPlaceholder-0.1.0.lbpkg`
+- Placeholder command: `/mysk ping`
+
 ## End-to-End Checklist (Capture -> Decode -> NapCat Push)
 
 ### 1) Server / Network

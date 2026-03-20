@@ -127,6 +127,13 @@ python -m unittest discover -s tests -p "test_*.py" -v
 - 通知流程轻集成（`process_mysekai_notification` 的跳过与命中路径）
 - HTTP 接口（`GET /healthz`、`GET /upload.js`、`GET /`）
 
+## LangBot 插件占位包（上传测试用）
+
+- 目录：`04_artifacts/langbot_plugin_placeholder/MysekaiQueryPlaceholder`
+- 可直接上传包：
+- `04_artifacts/langbot_plugin_placeholder/dist/MysekaiQueryPlaceholder-0.1.0.lbpkg`
+- 占位指令：`/mysk ping`
+
 ## 端到端检查清单（Capture -> Decode -> NapCat Push）
 
 ### 1) 服务器 / 网络

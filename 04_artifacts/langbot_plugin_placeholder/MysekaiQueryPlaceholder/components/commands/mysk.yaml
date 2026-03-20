@@ -1,0 +1,15 @@
+﻿apiVersion: v1
+kind: Command
+metadata:
+  name: mysk
+  label:
+    en_US: Mysekai Query
+    zh_Hans: Mysekai 查询
+  description:
+    en_US: Query placeholder command for mysekai.
+    zh_Hans: 用于测试的 mysekai 查询占位指令。
+spec: {}
+execution:
+  python:
+    path: mysk.py
+    attr: Mysk
