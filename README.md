@@ -15,6 +15,11 @@ This repository contains local and dockerized receivers for:
 - Use with Shadowrocket `script-path`:
   - `http://<your-local-ip>:8000/upload.js`
 
+## Local Automation
+
+- Scheduled auto-commit script: `auto_commit.ps1` (invoked by `auto_commit.bat`)
+- Auto-commit tracked paths include `tests/` so newly added unit tests can be committed by task automation.
+
 ## Docker Receiver (Dev)
 
 - Directory: `04_artifacts/docker_receiver_3939_dev`
