@@ -42,9 +42,9 @@ docker run -d \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
   -e MYSEKAI_ICON_SPREAD=22 \
-  -e ALERT_WINDOW_CACHE_HOURS=72 \
-  -e ALERT_HIT_RETENTION=100 \
-  -e ALERT_EVENT_RETENTION_LINES=5000 \
+  -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
+  -e NOTIFICATION_HIT_RETENTION=100 \
+  -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
@@ -71,7 +71,7 @@ curl -sS http://127.0.0.1:3939/healthz
 - 解密 json：`/data/decoded_api/suite` 或 `/data/decoded_api/mysekai`
 - Mysekai 渲染图：`/data/decoded_api/mysekai/maps`
 - 服务日志（滚动）：`/data/logs/receiver.log`
-- 钻石告警触发条件：解密后的全量 mysekai 包中出现 `mysekai_material:12`
+- 钻石通知触发条件：解密后的全量 mysekai 包中出现 `mysekai_material:12`
 - 渲染触发条件：仅当 id=12 命中且通过当前窗口去重
 - 渲染输出：按命中地图输出多张；只生成/发送命中地图
 - 渲染参数：
@@ -83,8 +83,8 @@ curl -sS http://127.0.0.1:3939/healthz
     - `SITE<id>_OFFSET_X_DELTA`, `SITE<id>_OFFSET_Z_DELTA`
     - `SITE<id>_SCALE_X_DELTA`, `SITE<id>_SCALE_Z_DELTA`
   - 当前默认校准：site6（beach）图层整体上移约 12.5%
-- 钻石命中归档：`/data/alerts/hits/`
-- 告警事件日志：`/data/alerts/diamond_events.jsonl`
+- 钻石命中归档：`/data/notifications/hits/`
+- 通知事件日志：`/data/notifications/diamond_notifications.jsonl`
 - 健康检查接口：`GET /healthz`
 - `BOT_TOKEN` 是 NapCat HTTP Server Token（Bearer Token）
 

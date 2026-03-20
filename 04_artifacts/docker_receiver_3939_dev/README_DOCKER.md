@@ -42,9 +42,9 @@ docker run -d \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
   -e MYSEKAI_ICON_SPREAD=22 \
-  -e ALERT_WINDOW_CACHE_HOURS=72 \
-  -e ALERT_HIT_RETENTION=100 \
-  -e ALERT_EVENT_RETENTION_LINES=5000 \
+  -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
+  -e NOTIFICATION_HIT_RETENTION=100 \
+  -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
@@ -71,7 +71,7 @@ curl -sS http://127.0.0.1:3939/healthz
 - decoded json: /data/decoded_api/suite or /data/decoded_api/mysekai
 - mysekai rendered maps: /data/decoded_api/mysekai/maps
 - service logs (rolling): /data/logs/receiver.log
-- diamond alert trigger: decoded mysekai full packet contains `mysekai_material:12`
+- diamond notification trigger: decoded mysekai full packet contains `mysekai_material:12`
 - render trigger: only when id=12 hit passes dedup in current time window
 - render output: one image per hit site; only hit sites are generated/sent
 - render tuning:
@@ -83,8 +83,8 @@ curl -sS http://127.0.0.1:3939/healthz
     - `SITE<id>_OFFSET_X_DELTA`, `SITE<id>_OFFSET_Z_DELTA`
     - `SITE<id>_SCALE_X_DELTA`, `SITE<id>_SCALE_Z_DELTA`
   - current default calibration lifts site 6 (beach) overlays by about 12.5% vertically
-- diamond hit archives: /data/alerts/hits/
-- diamond alert events: /data/alerts/diamond_events.jsonl
+- diamond hit archives: /data/notifications/hits/
+- diamond notification events: /data/notifications/diamond_notifications.jsonl
 - health check endpoint: GET /healthz
 - `BOT_TOKEN` is the NapCat HTTP server token (Authorization Bearer token)
 

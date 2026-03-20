@@ -24,7 +24,7 @@ def load_receiver_module():
 class ReceiverLogicTests(unittest.TestCase):
     def setUp(self):
         self.receiver = load_receiver_module()
-        self.receiver.ALERT_DEDUP_CACHE.clear()
+        self.receiver.NOTIFICATION_DEDUP_CACHE.clear()
 
     def test_extract_api_type(self):
         self.assertEqual(

@@ -5,6 +5,7 @@
   - 2026-03-18: tuned Mysekai beach map (siteId=6) overlay vertical alignment by lifting render placement ~12.5% for better icon-to-map fit.
   - 2026-03-19: added unit tests for receiver core logic (`extract_api_type`, `find_diamond_hits`, `get_refresh_window_id`, `filter_hits_for_current_window`) under `tests/`.
   - 2026-03-20: updated auto-commit path whitelist to include `tests/`, so scheduled commits can include newly added test files.
+  - 2026-03-20: updated auto-commit whitelist to include `README.zh-CN.md`, so bilingual root docs are committed by scheduled automation.
 - Current priority:
   - Implement strict "first hit only per window" dedup (current dedup is point-based within window).
 - [x] Capture `suite` / `mysekai` responses
@@ -14,7 +15,7 @@
 - [x] Push notification via NapCat HTTP API
 - [x] Log rotation and file retention
 - [x] Health check endpoint (`/healthz`)
-- [x] Full-site Mysekai map output for alerts (no point-only crop)
+- [x] Full-site Mysekai map output for notifications (no point-only crop)
 - [x] Configurable Mysekai icon/text sizing (`MYSEKAI_ICON_SIZE`, `MYSEKAI_COUNT_FONT_SIZE`, `MYSEKAI_ICON_SPREAD`)
 
 ## 1. Security hardening
@@ -26,7 +27,7 @@
 
 ## 2. Reliability and resilience
 - [ ] Persist dedup cache with periodic flush + graceful shutdown flush
-- [ ] Add failed-push retry queue file (`/data/alerts/retry_queue.jsonl`) and background retry worker
+- [ ] Add failed-push retry queue file (`/data/notifications/retry_queue.jsonl`) and background retry worker
 - [ ] Add startup self-check: validate NapCat endpoint and token, print clear status
 - [ ] Add structured error codes in logs for quick triage
 - [ ] Add container readiness endpoint (`/readyz`) in addition to `/healthz`
@@ -55,7 +56,7 @@
 - [ ] Add counters in logs:
   - [ ] total uploads
   - [ ] decode success/fail
-  - [ ] alert hit count
+  - [ ] notification hit count
   - [ ] push success/fail
 - [ ] Add daily summary log task
 - [ ] Add simple `/metrics` endpoint (Prometheus text format, optional)
@@ -74,5 +75,5 @@
 ## 8. Open decisions
 - [ ] Primary push target mode by default: `private` or `group`
 - [ ] Whether to include source file name in end-user notification
-- [ ] Keep alert event logs forever or rotate by days
+- [ ] Keep notification event logs forever or rotate by days
 - [ ] Whether to require HTTPS before production rollout

@@ -7,7 +7,7 @@ This repository contains local and dockerized receivers for:
 - capturing `suite` / `mysekai` API payloads
 - decoding payloads
 - generating suite card images
-- optional Mysekai diamond (`id=12`) alert push via NapCat
+- optional Mysekai diamond (`id=12`) notification push via NapCat
 
 ## Local Script (Windows)
 
@@ -20,6 +20,7 @@ This repository contains local and dockerized receivers for:
 
 - Scheduled auto-commit script: `auto_commit.ps1` (invoked by `auto_commit.bat`)
 - Auto-commit tracked paths include `tests/` so newly added unit tests can be committed by task automation.
+- Auto-commit tracked paths include both root READMEs: `README.md` and `README.zh-CN.md`.
 
 ## Docker Receiver (Dev)
 
@@ -68,9 +69,9 @@ docker run -d \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
   -e MYSEKAI_ICON_SPREAD=22 \
-  -e ALERT_WINDOW_CACHE_HOURS=72 \
-  -e ALERT_HIT_RETENTION=100 \
-  -e ALERT_EVENT_RETENTION_LINES=5000 \
+  -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
+  -e NOTIFICATION_HIT_RETENTION=100 \
+  -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
@@ -86,8 +87,8 @@ Data output:
 - decoded json: `/data/decoded_api/...`
 - mysekai rendered maps: `/data/decoded_api/mysekai/maps/...`
 - logs: `/data/logs/receiver.log`
-- alert hits: `/data/alerts/hits/`
-- alert events: `/data/alerts/diamond_events.jsonl`
+- notification hits: `/data/notifications/hits/`
+- notification events: `/data/notifications/diamond_notifications.jsonl`
 
 Quick checks after start:
 
@@ -100,7 +101,7 @@ curl -sS http://127.0.0.1:3939/healthz
 
 ## Virtual Diamond Alert Test
 
-Run inside server to trigger test alert without entering game:
+Run inside server to trigger test notification without entering game:
 
 ```bash
 docker exec -i pjsk-receiver-dev python - <<'PY'
@@ -125,7 +126,7 @@ mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 mod.setup_logging()
 mod.load_dedup_cache()
-mod.process_mysekai_alert(
+mod.process_mysekai_notification(
     test_path,
     "https://mkcn-prod-public-60001-1.dailygn.com/api/user/<YOUR_USER_ID>/mysekai?isForceAllReloadOnlyMysekai=True"
 )
@@ -189,7 +190,7 @@ Use this checklist when you want the complete pipeline to work on a server.
   - `-p 3939:3939`
   - `-v /opt/pjsk-captures:/data`
   - `-e PUBLIC_HOST=<YOUR_SERVER_PUBLIC_IP_OR_DOMAIN>`
-  - NapCat push envs (`BOT_PUSH_*`, `BOT_TOKEN`) if alert is enabled.
+  - NapCat push envs (`BOT_PUSH_*`, `BOT_TOKEN`) if notification is enabled.
 
 ### 3) Configure NapCat HTTP API
 
@@ -226,19 +227,19 @@ Use this checklist when you want the complete pipeline to work on a server.
 
 - Use virtual test (section `Virtual Diamond Alert Test`) to send a synthetic `id=12` packet.
 - Expected:
-  - `/data/alerts/hits/*.json` created
-  - `/data/alerts/diamond_events.jsonl` appended
+  - `/data/notifications/hits/*.json` created
+  - `/data/notifications/diamond_notifications.jsonl` appended
   - NapCat sends message to configured private QQ or group target.
 
 ### 7) Runtime behavior (current implementation)
 
-- Diamond alert source: decoded **full** Mysekai packet containing `mysekai_material:12`.
-- Map render trigger: only when alert condition is met (id=12 + dedup pass in current window).
+- Diamond notification source: decoded **full** Mysekai packet containing `mysekai_material:12`.
+- Map render trigger: only when notification condition is met (id=12 + dedup pass in current window).
 - Render output: one map image per hit site; only hit sites are rendered/sent; no multi-map merge.
 - Dedup logic is window-based:
   - refresh windows at local `05:00` and `17:00`
   - same point in same window is not pushed repeatedly
-  - dedup cache persisted at `/data/alerts/dedup_cache.json`
+  - dedup cache persisted at `/data/notifications/notification_dedup_cache.json`
 - Push payload:
   - default `BOT_MESSAGE_MODE=text+image`
   - image push failure falls back to text push
@@ -253,8 +254,8 @@ Use this checklist when you want the complete pipeline to work on a server.
   - current default calibration lifts site 6 (beach) overlays by about 12.5% vertically for better alignment
 - Retention:
   - raw/decoded/cards keep latest `RETENTION_COUNT`
-  - alert hit files keep `ALERT_HIT_RETENTION`
-  - alert events jsonl keep latest `ALERT_EVENT_RETENTION_LINES` lines
+  - notification hit files keep `NOTIFICATION_HIT_RETENTION`
+  - notification events jsonl keep latest `NOTIFICATION_EVENT_RETENTION_LINES` lines
 
 ### 8) Common failure points
 
