@@ -27,6 +27,9 @@ AGENTS.md
 # Keep TODO local only.
 00_docs/TODO.md
 
+# Local reference repository (not part of project source).
+reference/
+
 # Ignore generated artifacts inside whitelisted paths.
 01_scripts/**/__pycache__/
 tests/**/__pycache__/

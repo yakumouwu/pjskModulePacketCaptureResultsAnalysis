@@ -63,6 +63,13 @@ docker exec -it pjsk-receiver python -m sssekai -h
 curl -sS http://127.0.0.1:3939/healthz
 ```
 
+Container-to-container connectivity check (from `langbot` container):
+
+```bash
+docker exec -it langbot python -c "import urllib.request;print(urllib.request.urlopen('http://pjsk-receiver-dev:3939/healthz',timeout=5).read().decode())"
+docker exec -it langbot python -c "import urllib.request;print(urllib.request.urlopen('http://pjsk-receiver-dev:3939/api/plugin/mysekai/map?mysekai_user_id=<YOUR_MYSEKAI_USER_ID>&requester_qq=123456',timeout=20).read().decode())"
+```
+
 ## Data paths in container
 
 - raw bin: /data/raw_api/suite or /data/raw_api/mysekai

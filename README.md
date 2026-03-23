@@ -159,6 +159,13 @@ Current coverage scope:
 - `backend_map_api_path`
 - `backend_api_key`
 
+Validated behavior (current):
+- `mysk bind <mysekai_user_id>` stores a per-QQ binding (`QQ user_id -> mysekai_user_id`)
+- `mysk map` queries the latest available full mysekai packet of the bound user
+- `mysk map site <id>` returns a single-site map (`id` in `5,6,7,8`)
+- unbound query returns: `not bound, use: mysk bind <mysekai_user_id>`
+- no data query returns: `map query failed: no full mysekai packet found for user`
+
 ## End-to-End Checklist (Capture -> Decode -> NapCat Push)
 
 ### 1) Server / Network
