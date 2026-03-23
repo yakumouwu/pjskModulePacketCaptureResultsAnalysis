@@ -45,6 +45,7 @@ docker run -d \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
   -e MYSEKAI_ICON_SPREAD=22 \
+  -e SITE6_OFFSET_Z_DELTA=35 \
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
@@ -53,6 +54,8 @@ docker run -d \
   -v /opt/pjsk-config:/data/config \
   pjsk-receiver:latest
 ```
+
+说明：`SITE6_OFFSET_Z_DELTA=35` 为可选微调参数，用于当前部署中的 site6 查询渲染校准。
 
 启动后快速检查：
 
@@ -68,6 +71,16 @@ curl -sS http://127.0.0.1:3939/healthz
 ```bash
 docker exec -it langbot python -c "import urllib.request;print(urllib.request.urlopen('http://pjsk-receiver-dev:3939/healthz',timeout=5).read().decode())"
 docker exec -it langbot python -c "import urllib.request;print(urllib.request.urlopen('http://pjsk-receiver-dev:3939/api/plugin/mysekai/map?mysekai_user_id=<YOUR_MYSEKAI_USER_ID>&requester_qq=123456',timeout=20).read().decode())"
+```
+
+重建后渲染测试（site6）：
+
+```bash
+docker exec -it pjsk-receiver-dev /bin/sh -lc 'SITE6_OFFSET_Z_DELTA=35 python /app/dockerScripts/render_mysekai_map.py \
+  /data/decoded_api/mysekai/<YOUR_SOURCE_JSON>.json \
+  /data/decoded_api/mysekai/maps/plugin_api/site6_final_check.png \
+  /app/dockerScripts/mysekai_assets \
+  --site-id 6 --target-size 1024'
 ```
 
 ## 容器内数据路径
@@ -101,9 +114,10 @@ docker exec -it langbot python -c "import urllib.request;print(urllib.request.ur
 - 查询参数：
   - `mysekai_user_id`（必填）
   - `requester_qq`（可选）
-  - `site_id`（可选，取值 `5,6,7,8`）
+  - `site_id`（可选，取值 `5,6,7,8`，分别对应 `初始空地/心愿沙滩/烂漫花田/忘却之所`）
 - 成功响应格式：
   - `{ "ok": true, "message": "ok", "data": { "text": "...", "images": ["http://..."] } }`
+  - 文本规则：不显示 `user_id`/`requester_qq`；若可从全量包解析到用户名则显示“用户：<名称>”，否则仅显示地图信息。
 
 ## NapCat API 基线（v4.17.48）
 

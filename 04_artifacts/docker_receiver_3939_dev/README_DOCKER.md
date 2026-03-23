@@ -45,6 +45,7 @@ docker run -d \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
   -e MYSEKAI_ICON_SPREAD=22 \
+  -e SITE6_OFFSET_Z_DELTA=35 \
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
@@ -53,6 +54,8 @@ docker run -d \
   -v /opt/pjsk-config:/data/config \
   pjsk-receiver:latest
 ```
+
+Note: `SITE6_OFFSET_Z_DELTA=35` is an optional tuning value used in current deployment to adjust site6 query rendering.
 
 Quick checks after start:
 
@@ -68,6 +71,16 @@ Container-to-container connectivity check (from `langbot` container):
 ```bash
 docker exec -it langbot python -c "import urllib.request;print(urllib.request.urlopen('http://pjsk-receiver-dev:3939/healthz',timeout=5).read().decode())"
 docker exec -it langbot python -c "import urllib.request;print(urllib.request.urlopen('http://pjsk-receiver-dev:3939/api/plugin/mysekai/map?mysekai_user_id=<YOUR_MYSEKAI_USER_ID>&requester_qq=123456',timeout=20).read().decode())"
+```
+
+Post-rebuild rendering test (site6):
+
+```bash
+docker exec -it pjsk-receiver-dev /bin/sh -lc 'SITE6_OFFSET_Z_DELTA=35 python /app/dockerScripts/render_mysekai_map.py \
+  /data/decoded_api/mysekai/<YOUR_SOURCE_JSON>.json \
+  /data/decoded_api/mysekai/maps/plugin_api/site6_final_check.png \
+  /app/dockerScripts/mysekai_assets \
+  --site-id 6 --target-size 1024'
 ```
 
 ## Data paths in container
@@ -102,9 +115,10 @@ docker exec -it langbot python -c "import urllib.request;print(urllib.request.ur
 - Query parameters:
   - `mysekai_user_id` (required)
   - `requester_qq` (optional)
-  - `site_id` (optional, one of `5,6,7,8`)
+  - `site_id` (optional, one of `5,6,7,8`; labels: `初始空地/心愿沙滩/烂漫花田/忘却之所`)
 - Successful response format:
   - `{ "ok": true, "message": "ok", "data": { "text": "...", "images": ["http://..."] } }`
+  - Text rule: `user_id`/`requester_qq` are not shown; if a display name can be parsed from full packet it shows `用户：<name>`, otherwise only map info is shown.
 
 ## NapCat API baseline (v4.17.48)
 

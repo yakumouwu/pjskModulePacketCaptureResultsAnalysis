@@ -62,6 +62,12 @@ SITE_LABELS = {
     7: "Map 3 (flowergarden)",
     8: "Map 4 (memorialplace)",
 }
+SITE_LABELS_CN = {
+    5: "初始空地",
+    7: "烂漫花田",
+    6: "心愿沙滩",
+    8: "忘却之所",
+}
 ALL_SITE_IDS = tuple(sorted(SITE_LABELS.keys()))
 
 
@@ -691,11 +697,14 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             image_urls = [_build_public_image_url(os.path.basename(p)) for p in image_paths]
-            site_text = ",".join(str(sid) for sid in site_ids)
-            text = (
-                f"Mysekai map query success: user={mysekai_user_id}, "
-                f"sites={site_text}, requester={requester_qq or 'unknown'}"
-            )
+            # Query text policy:
+            # - full-site query: no text
+            # - single-site query: show localized site name only
+            if len(site_ids) == 1:
+                label = SITE_LABELS_CN.get(site_ids[0], f"站点{site_ids[0]}")
+                text = f"地图：{label}"
+            else:
+                text = ""
             _json_response(
                 self,
                 200,
