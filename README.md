@@ -1,4 +1,4 @@
-# project-sekai
+﻿# project-sekai
 [中文](./README.zh-CN.md) | [Docker English](./04_artifacts/docker_receiver_3939_dev/README_DOCKER.md) | [Docker 中文](./04_artifacts/docker_receiver_3939_dev/README_DOCKER.zh-CN.md)
 
 ## Overview
@@ -54,6 +54,8 @@ docker run -d \
   -e NOTIFICATION_USER_LABEL=<YOUR_USER_LABEL> \
   -e BOT_PUSH_RETRY=3 \
   -e BOT_MESSAGE_MODE=text+image \
+  -e PLUGIN_API_KEY=<OPTIONAL_PLUGIN_API_KEY> \
+  -e PLUGIN_QUERY_IMAGE_RETENTION=25 \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
@@ -77,6 +79,8 @@ Data output:
 - logs: `/data/logs/receiver.log`
 - notification hits: `/data/notifications/hits/`
 - notification events: `/data/notifications/diamond_notifications.jsonl`
+- automatic notification dedup/render rule: per user, only the first diamond hit in each window triggers render/push (`05:00-17:00` and `17:00-next 05:00`)
+- plugin query render rule: with an available full mysekai packet, map rendering is allowed even without diamond hits
 
 ## Virtual Diamond Notification Test
 
@@ -119,13 +123,51 @@ Run from repository root:
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
+## Auto Commit Task (Local)
+
+- Existing scripts:
+- `auto_commit.bat`
+- `auto_commit.ps1`
+- Logs:
+- `logs/auto_commit.log`
+- `logs/auto_commit_runner.log`
+- Network note:
+- script retries `git pull --rebase` and `git push` automatically when remote access is unstable.
+
 Current coverage scope:
 - API routing detection (`extract_api_type`)
 - Diamond extraction (`find_diamond_hits`, mixed payload cases)
 - Window boundary and dedup cache logic (`get_refresh_window_id`, `filter_hits_for_current_window`, `cleanup_window_dedup_cache`)
 - Notification push behavior (`send_bot_message`, `push_text_with_optional_image`, retry/fallback/mode branches)
 - Notification pipeline light integration (`process_mysekai_notification` skip/hit branches)
-- HTTP endpoints (`GET /healthz`, `GET /upload.js`, `GET /`)
+- HTTP endpoints (`GET /healthz`, `GET /upload.js`, `GET /api/plugin/mysekai/map`, `GET /api/plugin/mysekai/file`, `GET /`)
+
+## LangBot Placeholder Plugin (Upload Smoke Test)
+
+- Source directory: `04_artifacts/langbot_plugin_placeholder/MysekaiQueryPlaceholder`
+- Upload-ready package:
+- `04_artifacts/langbot_plugin_placeholder/dist/MysekaiQueryPlaceholder-0.3.0.lbpkg`
+- Supported commands:
+- `mysk ping`
+- `mysk bind <mysekai_user_id>`
+- `mysk unbind`
+- `mysk whoami`
+- `mysk map`
+- `mysk map site <id>`
+- invalid `mysk map` args are rejected with usage hint (no silent fallback to full-map query)
+- Backend-related config keys:
+- `backend_base_url`
+- `backend_map_api_path`
+- `backend_api_key`
+
+Validated behavior (current):
+- `mysk bind <mysekai_user_id>` stores a per-QQ binding (`QQ user_id -> mysekai_user_id`)
+- `mysk map` queries the latest available full mysekai packet of the bound user
+- `mysk map site <id>` returns a single-site map (`id` in `5,6,7,8`)
+- query text uses localized site labels (`5=初始空地`, `7=烂漫花田`, `6=心愿沙滩`, `8=忘却之所`)
+- query text policy: full query returns empty text; single-site query returns localized map name only
+- unbound query returns: `not bound, use: mysk bind <mysekai_user_id>`
+- no data query returns: `map query failed: no full mysekai packet found for user`
 
 ## End-to-End Checklist (Capture -> Decode -> NapCat Push)
 

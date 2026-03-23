@@ -1,4 +1,4 @@
-# Mysekai/Suite Receiver Docker (Port 3939)
+﻿# Mysekai/Suite Receiver Docker (Port 3939)
 [中文](./README_DOCKER.zh-CN.md) | [Project README](../../README.md) | [项目中文总览](../../README.zh-CN.md)
 
 Runtime scripts are stored in `dockerScripts/` and copied into the image as `/app/dockerScripts`.
@@ -39,10 +39,14 @@ docker run -d \
   -e NOTIFICATION_USER_LABEL=<YOUR_USER_LABEL> \
   -e BOT_PUSH_RETRY=3 \
   -e BOT_MESSAGE_MODE=text+image \
+  -e PLUGIN_API_KEY=<OPTIONAL_PLUGIN_API_KEY> \
+  -e PLUGIN_QUERY_IMAGE_RETENTION=25 \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
   -e MYSEKAI_ICON_SPREAD=22 \
+  -e SITE6_OFFSET_Z_DELTA=55 \ 
+  -e SITE6_OFFSET_X_DELTA=25 \ 
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
@@ -51,6 +55,8 @@ docker run -d \
   -v /opt/pjsk-config:/data/config \
   pjsk-receiver:latest
 ```
+
+Note: `SITE6_OFFSET_Z_DELTA=35` is an optional tuning value used in current deployment to adjust site6 query rendering.
 
 Quick checks after start:
 
@@ -61,6 +67,23 @@ docker exec -it pjsk-receiver python -m sssekai -h
 curl -sS http://127.0.0.1:3939/healthz
 ```
 
+Container-to-container connectivity check (from `langbot` container):
+
+```bash
+docker exec -it langbot python -c "import urllib.request;print(urllib.request.urlopen('http://pjsk-receiver-dev:3939/healthz',timeout=5).read().decode())"
+docker exec -it langbot python -c "import urllib.request;print(urllib.request.urlopen('http://pjsk-receiver-dev:3939/api/plugin/mysekai/map?mysekai_user_id=<YOUR_MYSEKAI_USER_ID>&requester_qq=123456',timeout=20).read().decode())"
+```
+
+Post-rebuild rendering test (site6):
+
+```bash
+docker exec -it pjsk-receiver-dev /bin/sh -lc 'SITE6_OFFSET_Z_DELTA=35 python /app/dockerScripts/render_mysekai_map.py \
+  /data/decoded_api/mysekai/<YOUR_SOURCE_JSON>.json \
+  /data/decoded_api/mysekai/maps/plugin_api/site6_final_check.png \
+  /app/dockerScripts/mysekai_assets \
+  --site-id 6 --target-size 1024'
+```
+
 ## Data paths in container
 
 - raw bin: /data/raw_api/suite or /data/raw_api/mysekai
@@ -68,7 +91,8 @@ curl -sS http://127.0.0.1:3939/healthz
 - mysekai rendered maps: /data/decoded_api/mysekai/maps
 - service logs (rolling): /data/logs/receiver.log
 - diamond notification trigger: decoded mysekai full packet contains `mysekai_material:12`
-- render trigger: only when id=12 hit passes dedup in current time window
+- automatic notification render trigger: only the first id=12 hit in current window can render/push (`05:00-17:00`, `17:00-next 05:00`)
+- plugin query render trigger: any available full mysekai packet can be rendered (not limited by diamond hit)
 - render output: one image per hit site; only hit sites are generated/sent
 - render tuning:
   - `MYSEKAI_MAP_IMAGE_SIZE`: final output size
@@ -82,7 +106,22 @@ curl -sS http://127.0.0.1:3939/healthz
 - diamond hit archives: /data/notifications/hits/
 - diamond notification events: /data/notifications/diamond_notifications.jsonl
 - health check endpoint: GET /healthz
+- plugin map query endpoint: GET /api/plugin/mysekai/map
+- plugin image file endpoint: GET /api/plugin/mysekai/file?name=<file_name>
 - `BOT_TOKEN` is the NapCat HTTP server token (Authorization Bearer token)
+
+## Plugin Query API
+
+- Optional auth header: `X-API-Key` (enabled only when `PLUGIN_API_KEY` is set)
+- Query parameters:
+  - `mysekai_user_id` (required)
+  - `requester_qq` (optional)
+  - `site_id` (optional, one of `5,6,7,8`; labels: `初始空地/心愿沙滩/烂漫花田/忘却之所`)
+- Successful response format:
+  - `{ "ok": true, "message": "ok", "data": { "text": "...", "images": ["http://..."] } }`
+  - Text rule:
+    - full query (without `site_id`) returns empty text
+    - single-site query (with `site_id`) returns localized map name only (e.g. `地图：心愿沙滩`)
 
 ## NapCat API baseline (v4.17.48)
 

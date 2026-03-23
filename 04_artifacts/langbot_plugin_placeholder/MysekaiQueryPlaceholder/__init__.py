@@ -1,0 +1,1 @@
+"""MysekaiQueryPlaceholder plugin package."""

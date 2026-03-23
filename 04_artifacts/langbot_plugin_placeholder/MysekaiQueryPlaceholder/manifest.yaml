@@ -1,0 +1,73 @@
+﻿apiVersion: v1
+kind: Plugin
+metadata:
+  author: yakumouwu
+  name: MysekaiQueryPlaceholder
+  repository: 'https://github.com/yakumouwu/MysekaiAnalysis'
+  version: 0.3.0
+  description:
+    en_US: 'Mysekai query plugin with binding, rate-limit and backend API integration.'
+    zh_Hans: '支持绑定、限频和后端 API 查询的 Mysekai 指令插件。'
+  label:
+    en_US: 'MysekaiQuery'
+    zh_Hans: 'Mysekai 查询'
+  icon: assets/icon.svg
+spec:
+  config:
+    - name: backend_base_url
+      type: string
+      label:
+        en_US: 'Backend Base URL'
+        zh_Hans: '后端基础地址'
+      required: true
+      default: 'http://pjsk-receiver-dev:3939'
+    - name: backend_map_api_path
+      type: string
+      label:
+        en_US: 'Map API Path'
+        zh_Hans: '地图查询 API 路径'
+      required: true
+      default: '/api/plugin/mysekai/map'
+    - name: backend_api_key
+      type: string
+      label:
+        en_US: 'Backend API Key'
+        zh_Hans: '后端 API Key'
+      required: false
+      default: ''
+    - name: command_prefix
+      type: string
+      label:
+        en_US: 'Command Prefix'
+        zh_Hans: '指令前缀'
+      required: true
+      default: 'mysk'
+    - name: query_rate_limit_sec
+      type: string
+      label:
+        en_US: 'Query Rate Limit Seconds'
+        zh_Hans: '查询限频秒数'
+      required: true
+      default: '60'
+    - name: request_timeout_sec
+      type: string
+      label:
+        en_US: 'Request Timeout Seconds'
+        zh_Hans: '请求超时秒数'
+      required: true
+      default: '10'
+    - name: max_bindings
+      type: string
+      label:
+        en_US: 'Max Binding Count'
+        zh_Hans: '最大绑定数量'
+      required: true
+      default: '25'
+  components:
+    EventListener:
+      fromDirs:
+        - path: components/event_listener/
+execution:
+  python:
+    path: main.py
+    attr: MysekaiQueryPlaceholder

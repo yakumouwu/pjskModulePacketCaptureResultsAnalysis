@@ -9,6 +9,7 @@ import socketserver
 import subprocess
 import sys
 import time
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta
 from itertools import count
@@ -39,6 +40,10 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "").strip()
 BOT_PUSH_RETRY = int(os.environ.get("BOT_PUSH_RETRY", "3"))
 BOT_MESSAGE_MODE = os.environ.get("BOT_MESSAGE_MODE", "text+image").strip().lower()
 MYSEKAI_MAP_IMAGE_SIZE = int(os.environ.get("MYSEKAI_MAP_IMAGE_SIZE", "1024"))
+PLUGIN_API_KEY = os.environ.get("PLUGIN_API_KEY", "").strip()
+PLUGIN_QUERY_IMAGE_RETENTION = int(
+    os.environ.get("PLUGIN_QUERY_IMAGE_RETENTION", str(RETENTION_COUNT))
+)
 
 NOTIFICATION_HIT_RETENTION = int(os.environ.get("NOTIFICATION_HIT_RETENTION", "100"))
 NOTIFICATION_EVENT_RETENTION_LINES = int(
@@ -57,6 +62,13 @@ SITE_LABELS = {
     7: "Map 3 (flowergarden)",
     8: "Map 4 (memorialplace)",
 }
+SITE_LABELS_CN = {
+    5: "初始空地",
+    7: "烂漫花田",
+    6: "心愿沙滩",
+    8: "忘却之所",
+}
+ALL_SITE_IDS = tuple(sorted(SITE_LABELS.keys()))
 
 
 def extract_api_type(url):
@@ -315,41 +327,16 @@ def point_signature(point):
 
 
 def filter_hits_for_current_window(user_id, hits):
-    # Keep only points not sent in current refresh window.
+    # Strict window gating: only the first diamond hit in each refresh window can pass.
     now_dt = datetime.now()
     window_id = get_refresh_window_id(now_dt)
-    filtered = {}
-    changed = False
+    gate_key = f"{user_id}|{window_id}|first_hit_gate"
+    if gate_key in NOTIFICATION_DEDUP_CACHE:
+        return window_id, {}
 
-    for sid, detail in sorted(hits.items()):
-        points = detail.get("points", [])
-        if not points:
-            key = f"{user_id}|{window_id}|site:{sid}|site_only"
-            if key in NOTIFICATION_DEDUP_CACHE:
-                continue
-            NOTIFICATION_DEDUP_CACHE[key] = time.time()
-            filtered[sid] = {"qty": detail.get("qty", 0), "points": []}
-            changed = True
-            continue
-
-        new_points = []
-        qty_sum = 0
-        for p in points:
-            sig = point_signature(p)
-            key = f"{user_id}|{window_id}|site:{sid}|{sig}"
-            if key in NOTIFICATION_DEDUP_CACHE:
-                continue
-            NOTIFICATION_DEDUP_CACHE[key] = time.time()
-            new_points.append(p)
-            qty_sum += int(p.get("qty", 0))
-            changed = True
-
-        if new_points:
-            filtered[sid] = {"qty": qty_sum, "points": new_points}
-
-    if changed:
-        save_dedup_cache()
-    return window_id, filtered
+    NOTIFICATION_DEDUP_CACHE[gate_key] = time.time()
+    save_dedup_cache()
+    return window_id, hits
 
 
 def send_bot_message(message):
@@ -535,16 +522,101 @@ def process_mysekai_notification(out_json, original_url):
             )
 
 
+def _json_response(handler, status_code, payload):
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    handler.send_response(status_code)
+    handler.send_header("Content-Type", "application/json; charset=utf-8")
+    handler.send_header("Cache-Control", "no-store")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
+def _verify_plugin_api_key(handler):
+    if not PLUGIN_API_KEY:
+        return True
+    req_key = (handler.headers.get("X-API-Key", "") or "").strip()
+    return req_key == PLUGIN_API_KEY
+
+
+def _find_latest_full_mysekai_json(mysekai_user_id):
+    mysekai_dir = os.path.join(DECODED_BASE_DIR, "mysekai")
+    pattern = f"mysekai_user{mysekai_user_id}_*.json"
+    candidates = sorted(
+        Path(mysekai_dir).glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True
+    )
+    for path in candidates:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if is_mysekai_full_packet(data):
+                return str(path)
+        except Exception:
+            continue
+    return None
+
+
+def _render_map_for_plugin_query(json_path, mysekai_user_id, site_ids):
+    renderer = os.path.join(os.path.dirname(__file__), "render_mysekai_map.py")
+    assets_dir = os.path.join(os.path.dirname(__file__), "mysekai_assets")
+    if not os.path.exists(renderer):
+        return [], "renderer_not_found"
+    if not os.path.isdir(assets_dir):
+        return [], "assets_not_found"
+
+    map_dir = os.path.join(DECODED_BASE_DIR, "mysekai", "maps", "plugin_api")
+    os.makedirs(map_dir, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    image_paths = []
+
+    for site_id in site_ids:
+        out_name = f"mysekai_user{mysekai_user_id}_query_{ts}_site{site_id}.png"
+        out_path = os.path.join(map_dir, out_name)
+        cmd = [
+            sys.executable,
+            renderer,
+            json_path,
+            out_path,
+            assets_dir,
+            "--site-id",
+            str(site_id),
+            "--target-size",
+            str(MYSEKAI_MAP_IMAGE_SIZE),
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if proc.returncode == 0 and os.path.exists(out_path):
+            image_paths.append(out_path)
+        else:
+            logger.warning(
+                "Plugin map render failed site=%s err=%s",
+                site_id,
+                (proc.stderr or proc.stdout or "render_failed").strip(),
+            )
+
+    prune_old_files(map_dir, "mysekai_user*_query_*_site*.png", PLUGIN_QUERY_IMAGE_RETENTION)
+    return image_paths, "ok" if image_paths else "render_failed"
+
+
+def _build_public_image_url(file_name):
+    host = (PUBLIC_HOST or "").strip() or "127.0.0.1"
+    quoted = urllib.parse.quote(file_name)
+    return f"http://{host}:{PORT}/api/plugin/mysekai/file?name={quoted}"
+
+
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
-        if self.path == "/healthz":
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        query = urllib.parse.parse_qs(parsed.query)
+
+        if path == "/healthz":
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.end_headers()
             self.wfile.write(b"ok")
             return
 
-        if self.path == "/upload.js":
+        if path == "/upload.js":
             js_content = """
             const upload = () => {
                 $httpClient.post({
@@ -573,6 +645,104 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(js_content.encode("utf-8"))
             return
 
+        if path == "/api/plugin/mysekai/map":
+            if not _verify_plugin_api_key(self):
+                _json_response(self, 401, {"ok": False, "message": "invalid api key"})
+                return
+
+            mysekai_user_id = (query.get("mysekai_user_id", [""])[0] or "").strip()
+            requester_qq = (query.get("requester_qq", [""])[0] or "").strip()
+            site_id_raw = (query.get("site_id", [""])[0] or "").strip()
+
+            if not re.fullmatch(r"\d{6,25}", mysekai_user_id):
+                _json_response(
+                    self,
+                    400,
+                    {"ok": False, "message": "invalid mysekai_user_id"},
+                )
+                return
+
+            site_ids = list(ALL_SITE_IDS)
+            if site_id_raw:
+                if not site_id_raw.isdigit() or int(site_id_raw) not in SITE_LABELS:
+                    _json_response(
+                        self,
+                        400,
+                        {"ok": False, "message": "invalid site_id"},
+                    )
+                    return
+                site_ids = [int(site_id_raw)]
+
+            latest_json = _find_latest_full_mysekai_json(mysekai_user_id)
+            if not latest_json:
+                _json_response(
+                    self,
+                    404,
+                    {
+                        "ok": False,
+                        "message": "no full mysekai packet found for user",
+                    },
+                )
+                return
+
+            image_paths, status = _render_map_for_plugin_query(
+                latest_json, mysekai_user_id, site_ids
+            )
+            if status != "ok":
+                _json_response(
+                    self,
+                    500,
+                    {"ok": False, "message": f"render_failed: {status}"},
+                )
+                return
+
+            image_urls = [_build_public_image_url(os.path.basename(p)) for p in image_paths]
+            # Query text policy:
+            # - full-site query: no text
+            # - single-site query: show localized site name only
+            if len(site_ids) == 1:
+                label = SITE_LABELS_CN.get(site_ids[0], f"站点{site_ids[0]}")
+                text = f"地图：{label}"
+            else:
+                text = ""
+            _json_response(
+                self,
+                200,
+                {
+                    "ok": True,
+                    "message": "ok",
+                    "data": {
+                        "text": text,
+                        "images": image_urls,
+                        "source_json": os.path.basename(latest_json),
+                    },
+                },
+            )
+            return
+
+        if path == "/api/plugin/mysekai/file":
+            file_name = (query.get("name", [""])[0] or "").strip()
+            if not file_name:
+                self.send_response(400)
+                self.end_headers()
+                return
+            safe_name = os.path.basename(file_name)
+            map_dir = os.path.join(DECODED_BASE_DIR, "mysekai", "maps", "plugin_api")
+            file_path = os.path.join(map_dir, safe_name)
+            if not os.path.exists(file_path):
+                self.send_response(404)
+                self.end_headers()
+                return
+            with open(file_path, "rb") as f:
+                body = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         self.send_response(404)
         self.end_headers()
 
@@ -580,7 +750,22 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         original_url = self.headers.get("X-Original-Url", "")
         api_type = extract_api_type(original_url)
         filename = generate_filename(api_type, original_url)
-        content_length = int(self.headers["Content-Length"])
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            self.send_response(400)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b"invalid content-length")
+            return
+
+        if content_length <= 0:
+            self.send_response(400)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b"empty request body")
+            return
+
         received_data = self.rfile.read(content_length)
         raw_dir, decoded_dir = ensure_output_dirs(api_type)
         raw_path = os.path.join(raw_dir, filename)
@@ -645,6 +830,11 @@ if __name__ == "__main__":
     )
     logger.info("Bot message mode: %s", BOT_MESSAGE_MODE)
     logger.info("Mysekai map image size: %s", MYSEKAI_MAP_IMAGE_SIZE)
+    logger.info(
+        "Plugin map API: path=/api/plugin/mysekai/map api_key=%s image_retention=%s",
+        "(set)" if PLUGIN_API_KEY else "(empty)",
+        PLUGIN_QUERY_IMAGE_RETENTION,
+    )
     logger.info(
         "File naming format: [api_type]_[user]_[timestamp]_[ms]_[pid]_[seq].bin"
     )
