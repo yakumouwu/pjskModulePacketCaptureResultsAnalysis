@@ -45,7 +45,8 @@ docker run -d \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
   -e MYSEKAI_ICON_SPREAD=22 \
-  -e SITE6_OFFSET_Z_DELTA=35 \
+  -e SITE6_OFFSET_Z_DELTA=55 \ 
+  -e SITE6_OFFSET_X_DELTA=25 \ 
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
@@ -118,7 +119,9 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'SITE6_OFFSET_Z_DELTA=35 python /a
   - `site_id` (optional, one of `5,6,7,8`; labels: `初始空地/心愿沙滩/烂漫花田/忘却之所`)
 - Successful response format:
   - `{ "ok": true, "message": "ok", "data": { "text": "...", "images": ["http://..."] } }`
-  - Text rule: `user_id`/`requester_qq` are not shown; if a display name can be parsed from full packet it shows `用户：<name>`, otherwise only map info is shown.
+  - Text rule:
+    - full query (without `site_id`) returns empty text
+    - single-site query (with `site_id`) returns localized map name only (e.g. `地图：心愿沙滩`)
 
 ## NapCat API baseline (v4.17.48)
 

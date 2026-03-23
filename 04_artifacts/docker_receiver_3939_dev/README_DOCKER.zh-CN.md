@@ -45,7 +45,8 @@ docker run -d \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
   -e MYSEKAI_ICON_SPREAD=22 \
-  -e SITE6_OFFSET_Z_DELTA=35 \
+  -e SITE6_OFFSET_Z_DELTA=55 \ 
+  -e SITE6_OFFSET_X_DELTA=25 \ 
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
@@ -117,7 +118,9 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'SITE6_OFFSET_Z_DELTA=35 python /a
   - `site_id`（可选，取值 `5,6,7,8`，分别对应 `初始空地/心愿沙滩/烂漫花田/忘却之所`）
 - 成功响应格式：
   - `{ "ok": true, "message": "ok", "data": { "text": "...", "images": ["http://..."] } }`
-  - 文本规则：不显示 `user_id`/`requester_qq`；若可从全量包解析到用户名则显示“用户：<名称>”，否则仅显示地图信息。
+  - 文本规则：
+    - 全量查询（不带 `site_id`）返回空文本
+    - 单图查询（带 `site_id`）仅显示中文地图名（例如：`地图：心愿沙滩`）
 
 ## NapCat API 基线（v4.17.48）
 

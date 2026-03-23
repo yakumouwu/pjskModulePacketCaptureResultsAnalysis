@@ -165,6 +165,7 @@ Validated behavior (current):
 - `mysk map` queries the latest available full mysekai packet of the bound user
 - `mysk map site <id>` returns a single-site map (`id` in `5,6,7,8`)
 - query text uses localized site labels (`5=初始空地`, `7=烂漫花田`, `6=心愿沙滩`, `8=忘却之所`)
+- query text policy: full query returns empty text; single-site query returns localized map name only
 - unbound query returns: `not bound, use: mysk bind <mysekai_user_id>`
 - no data query returns: `map query failed: no full mysekai packet found for user`
 
