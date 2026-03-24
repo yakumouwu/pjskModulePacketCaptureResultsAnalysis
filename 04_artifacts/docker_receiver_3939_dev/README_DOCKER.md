@@ -47,8 +47,6 @@ docker run -d \
   -e MYSEKAI_ICON_SPREAD=22 \
   -e SITE6_WORLD_HALF_X=30 \
   -e SITE6_WORLD_HALF_Z=68 \
-  -e SITE6_OFFSET_Z_DELTA=55 \ 
-  -e SITE6_OFFSET_X_DELTA=25 \ 
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
@@ -58,7 +56,7 @@ docker run -d \
   pjsk-receiver:latest
 ```
 
-Note: query rendering now uses a fixed-origin projection (map center is world `(0,0)`). For cross-packet stability, fix `SITE<id>_WORLD_HALF_X/Z` first, then tune `OFFSET/SCALE`.
+Note: query rendering now uses a fixed-origin projection (map center is world `(0,0)`). Site6 now ships with a calibrated built-in default (roughly `SCALE_DELTA≈+12/+12`, `OFFSET_DELTA≈+90/+170` equivalent); you can still override with `SITE6_*_DELTA`.
 
 Quick checks after start:
 

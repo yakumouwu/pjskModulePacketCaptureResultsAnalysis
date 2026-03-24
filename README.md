@@ -84,6 +84,7 @@ Data output:
 - automatic notification dedup/render rule: per user, only the first diamond hit in each window triggers render/push (`05:00-17:00` and `17:00-next 05:00`)
 - plugin query render rule: with an available full mysekai packet, map rendering is allowed even without diamond hits
 - renderer projection rule: fixed-origin mode is used (map center = world `(0,0)`); lock `SITE<id>_WORLD_HALF_X/Z` for stable cross-packet alignment
+- site6 calibration: built-in defaults are pre-tuned (equivalent to `SCALE_DELTA≈+12/+12`, `OFFSET_DELTA≈+90/+170`), with optional runtime overrides via `SITE6_*_DELTA`
 
 ## Virtual Diamond Notification Test
 

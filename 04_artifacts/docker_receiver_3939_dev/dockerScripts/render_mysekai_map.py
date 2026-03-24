@@ -21,8 +21,11 @@ SITE_CONFIG = {
         "bg": "beach.png",
         "transform": "x_negz",
         "world_bounds": (-30.0, 29.0, -20.0, 68.0),
-        "scale_add": (4.6, 4.2),
-        "offset_add": (-70.0, -50.0),
+        # Calibrated default for stable query rendering:
+        # equivalent to WORLD_HALF_X=30, WORLD_HALF_Z=68 with
+        # SCALE_DELTA ~= +12/+12 and OFFSET_DELTA ~= +90/+170.
+        "scale_add": (16.6, 16.2),
+        "offset_add": (20.0, 120.0),
     },
     7: {
         "name": "Map 3",

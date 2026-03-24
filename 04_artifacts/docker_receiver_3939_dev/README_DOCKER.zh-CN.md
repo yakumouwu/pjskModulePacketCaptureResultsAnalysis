@@ -42,13 +42,11 @@ docker run -d \
   -e PLUGIN_API_KEY=<OPTIONAL_PLUGIN_API_KEY> \
   -e PLUGIN_QUERY_IMAGE_RETENTION=25 \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
- -e MYSEKAI_ICON_SIZE=36 \
+  -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
   -e MYSEKAI_ICON_SPREAD=22 \
   -e SITE6_WORLD_HALF_X=30 \
   -e SITE6_WORLD_HALF_Z=68 \
-  -e SITE6_OFFSET_Z_DELTA=55 \ 
-  -e SITE6_OFFSET_X_DELTA=25 \ 
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
@@ -58,7 +56,7 @@ docker run -d \
   pjsk-receiver:latest
 ```
 
-说明：查询渲染已改为固定零点投影（地图中心为世界坐标 `(0,0)`）。如果需要跨包稳定对齐，先固定 `SITE<id>_WORLD_HALF_X/Z`，再微调 `OFFSET/ SCALE`。
+说明：查询渲染已改为固定零点投影（地图中心为世界坐标 `(0,0)`）。当前代码内已固化一组 site6 校准参数（等效于 `SCALE_DELTA≈+12/+12`、`OFFSET_DELTA≈+90/+170`）；如需再调，可继续用 `SITE6_*_DELTA` 覆盖。
 
 启动后快速检查：
 
