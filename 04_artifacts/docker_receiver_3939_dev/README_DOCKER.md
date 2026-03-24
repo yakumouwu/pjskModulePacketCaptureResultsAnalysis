@@ -54,7 +54,7 @@ docker run -d \
   pjsk-receiver:latest
 ```
 
-Note: query rendering now uses a fixed-origin projection (map center is world `(0,0)`). Site5 and site6 now ship with calibrated built-in defaults (roughly `SCALE_DELTA≈+12/+12`, `OFFSET_DELTA≈+90/+170` equivalent); you can still override with `SITE<id>_*_DELTA`.
+Note: query rendering now uses a fixed-origin projection (map center is world `(0,0)`). All four sites now ship with calibrated built-in defaults, and you can still override them with `SITE<id>_*_DELTA` if needed.
 
 Quick checks after start:
 
@@ -72,14 +72,14 @@ docker exec -it langbot python -c "import urllib.request;print(urllib.request.ur
 docker exec -it langbot python -c "import urllib.request;print(urllib.request.urlopen('http://pjsk-receiver-dev:3939/api/plugin/mysekai/map?mysekai_user_id=<YOUR_MYSEKAI_USER_ID>&requester_qq=123456',timeout=20).read().decode())"
 ```
 
-Post-rebuild rendering test (site6):
+Post-rebuild rendering test (generic single-site):
 
 ```bash
-docker exec -it pjsk-receiver-dev /bin/sh -lc 'SITE6_OFFSET_Z_DELTA=35 python /app/dockerScripts/render_mysekai_map.py \
+docker exec -it pjsk-receiver-dev /bin/sh -lc 'python /app/dockerScripts/render_mysekai_map.py \
   /data/decoded_api/mysekai/<YOUR_SOURCE_JSON>.json \
-  /data/decoded_api/mysekai/maps/plugin_api/site6_final_check.png \
+  /data/decoded_api/mysekai/maps/plugin_api/site_check.png \
   /app/dockerScripts/mysekai_assets \
-  --site-id 6 --target-size 1024'
+  --site-id <5|6|7|8> --target-size 1024'
 ```
 
 ## Data paths in container
@@ -99,14 +99,20 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'SITE6_OFFSET_Z_DELTA=35 python /a
   - `MYSEKAI_ICON_SPREAD`: spread radius for multi-resource points
   - `MYSEKAI_IGNORE_BASE_MATERIALS`: whether to hide base materials on the same coordinate (default `1`)
     - rule: hide `id=1` if any `id=2..5` exists at that coordinate; hide `id=6` if any `id=7..12` exists
+  - fallback icons: only diamond (`mysekai_material:12`) and blueprint scrap (`mysekai_item:7`) are hardcoded
+  - unmapped music records are skipped entirely and no longer render placeholder dots
   - fixed world scale (recommended to lock first):
     - `SITE<id>_WORLD_HALF_X`, `SITE<id>_WORLD_HALF_Z`
-    - meaning: world half-range projected onto the map (for current built-ins: site5 `30/75`, site6 `30/68`)
+    - meaning: world half-range projected onto the map (current built-ins: site5 `30/75`, site6 `30/68`, site7 `30/75`, site8 `30/70`)
   - optional per-site tuning:
     - `SITE<id>_OFFSET_X_DELTA`, `SITE<id>_OFFSET_Z_DELTA`
     - `SITE<id>_SCALE_X_DELTA`, `SITE<id>_SCALE_Z_DELTA`
   - multi-resource icons on the same coordinate now use deterministic ordering (resource type + id)
-  - current default calibration lifts site 6 (beach) overlays by about 12.5% vertically
+  - current built-in defaults:
+    - site5: `scale_add=(25.5,25.5)`, `offset_add=(0,-90)`
+    - site6: `scale_add=(16.6,16.2)`, `offset_add=(20,120)`
+    - site7: `scale_add=(19,19)`, `offset_add=(-60,20)`
+    - site8: `scale_add=(16.6,16.2)`, `offset_add=(20,-120)`
 - diamond hit archives: /data/notifications/hits/
 - diamond notification events: /data/notifications/diamond_notifications.jsonl
 - health check endpoint: GET /healthz

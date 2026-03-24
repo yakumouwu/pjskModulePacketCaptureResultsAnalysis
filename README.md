@@ -85,9 +85,13 @@ Data output:
 - same-coordinate base material ignore (enabled by default): `MYSEKAI_IGNORE_BASE_MATERIALS=1`
   - hide `id=1` when any `id=2..5` exists at the same coordinate
   - hide `id=6` when any `id=7..12` exists at the same coordinate
-- site5/site6 calibration: built-in defaults are pre-tuned
-- site5 equivalent: `SCALE_DELTA≈+12/+12`, `OFFSET_DELTA≈+90/+170` (via site5 defaults)
-- site6 equivalent: `SCALE_DELTA≈+12/+12`, `OFFSET_DELTA≈+90/+170` (via site6 defaults)
+- fallback icons: only diamond (`mysekai_material:12`) and blueprint scrap (`mysekai_item:7`) use hardcoded fallback icons
+- unmapped music records are skipped during rendering and no longer show placeholder dots
+- current built-in calibration defaults:
+- site5: `world_bounds=(-30,29,-23,75)`, `scale_add=(25.5,25.5)`, `offset_add=(0,-90)`
+- site6: `world_bounds=(-30,29,-20,68)`, `scale_add=(16.6,16.2)`, `offset_add=(20,120)`
+- site7: `world_bounds=(-30,29,-28,75)`, `scale_add=(19,19)`, `offset_add=(-60,20)`
+- site8: `world_bounds=(-30,29,-29,70)`, `scale_add=(16.6,16.2)`, `offset_add=(20,-120)`
 
 ## Virtual Diamond Notification Test
 

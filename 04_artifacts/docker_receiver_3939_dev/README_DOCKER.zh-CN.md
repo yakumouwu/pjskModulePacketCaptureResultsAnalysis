@@ -54,7 +54,7 @@ docker run -d \
   pjsk-receiver:latest
 ```
 
-说明：查询渲染已改为固定零点投影（地图中心为世界坐标 `(0,0)`）。当前代码内已固化 site5/site6 校准参数（等效 `SCALE_DELTA≈+12/+12`、`OFFSET_DELTA≈+90/+170`）；如需再调，可继续用 `SITE<id>_*_DELTA` 覆盖。
+说明：查询渲染已改为固定零点投影（地图中心为世界坐标 `(0,0)`）。当前代码内 4 张地图都已固化一组默认参数；如需再调，可继续用 `SITE<id>_*_DELTA` 覆盖。
 
 启动后快速检查：
 
@@ -72,14 +72,14 @@ docker exec -it langbot python -c "import urllib.request;print(urllib.request.ur
 docker exec -it langbot python -c "import urllib.request;print(urllib.request.urlopen('http://pjsk-receiver-dev:3939/api/plugin/mysekai/map?mysekai_user_id=<YOUR_MYSEKAI_USER_ID>&requester_qq=123456',timeout=20).read().decode())"
 ```
 
-重建后渲染测试（site6）：
+重建后渲染测试（通用单图）：
 
 ```bash
-docker exec -it pjsk-receiver-dev /bin/sh -lc 'SITE6_OFFSET_Z_DELTA=35 python /app/dockerScripts/render_mysekai_map.py \
+docker exec -it pjsk-receiver-dev /bin/sh -lc 'python /app/dockerScripts/render_mysekai_map.py \
   /data/decoded_api/mysekai/<YOUR_SOURCE_JSON>.json \
-  /data/decoded_api/mysekai/maps/plugin_api/site6_final_check.png \
+  /data/decoded_api/mysekai/maps/plugin_api/site_check.png \
   /app/dockerScripts/mysekai_assets \
-  --site-id 6 --target-size 1024'
+  --site-id <5|6|7|8> --target-size 1024'
 ```
 
 ## 容器内数据路径
@@ -99,13 +99,20 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'SITE6_OFFSET_Z_DELTA=35 python /a
   - `MYSEKAI_ICON_SPREAD`：同点多资源图标扩散半径
   - `MYSEKAI_IGNORE_BASE_MATERIALS`：是否忽略同点位普通材料（默认 `1`）
     - 规则：同点位有 `id=1` 且存在 `id=2..5` 时隐藏 `id=1`；有 `id=6` 且存在 `id=7..12` 时隐藏 `id=6`
+  - 兜底图标仅保留：钻石（`mysekai_material:12`）与蓝图碎片（`mysekai_item:7`）
+  - 未映射的唱片资源会直接跳过，不再绘制黑点占位
   - 固定世界尺度（建议先固定后微调）：
     - `SITE<id>_WORLD_HALF_X`、`SITE<id>_WORLD_HALF_Z`
-    - 含义：世界坐标半轴范围，用于把固定坐标系投影到底图（当前内置：site5 `30/75`，site6 `30/68`）
+    - 含义：世界坐标半轴范围，用于把固定坐标系投影到底图（当前内置：site5 `30/75`，site6 `30/68`，site7 `30/75`，site8 `30/70`）
   - 可选站点微调：
     - `SITE<id>_OFFSET_X_DELTA`、`SITE<id>_OFFSET_Z_DELTA`
     - `SITE<id>_SCALE_X_DELTA`、`SITE<id>_SCALE_Z_DELTA`
   - 同一坐标多资源点采用稳定排序（按资源类型+ID），减少同点内部图标抖动
+  - 当前内置固化参数：
+    - site5：`scale_add=(25.5,25.5)`、`offset_add=(0,-90)`
+    - site6：`scale_add=(16.6,16.2)`、`offset_add=(20,120)`
+    - site7：`scale_add=(19,19)`、`offset_add=(-60,20)`
+    - site8：`scale_add=(16.6,16.2)`、`offset_add=(20,-120)`
 - 钻石命中归档：`/data/notifications/hits/`
 - 通知事件日志：`/data/notifications/diamond_notifications.jsonl`
 - 健康检查接口：`GET /healthz`

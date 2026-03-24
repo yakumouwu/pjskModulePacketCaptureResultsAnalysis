@@ -37,7 +37,7 @@ SITE_CONFIG = {
         "transform": "x_negz",
         "world_bounds": (-30.0, 29.0, -29.0, 70.0),
         "scale_add": (16.6, 16.2),
-        "offset_add": (20.0, 120.0),
+        "offset_add": (20.0, -120.0),
     },
 }
 
@@ -84,6 +84,7 @@ ASSET_ICON_TO_FILE = {
 
 FALLBACK_ICON_MAP = {
     ("mysekai_material", 12): "Diamond.png",
+    ("mysekai_item", 7): "Blueprint_Scrap.png",
 }
 
 
@@ -261,6 +262,15 @@ def _filter_same_coord_base_materials(stat):
     return stat
 
 
+def _filter_unmapped_record_entries(entries, icons):
+    filtered = []
+    for key, qty in entries:
+        if icons.get(key) is None and key[0] == "mysekai_music_record":
+            continue
+        filtered.append((key, qty))
+    return filtered
+
+
 def _render_site(points_by_site, site_id, assets_dir, target_size):
     coords = points_by_site.get(site_id, {})
     if not coords:
@@ -327,6 +337,10 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
         # Keep icon layout deterministic for the same coordinate:
         # sort by resource identity instead of current quantity.
         entries = sorted(stat.items(), key=lambda t: (t[0][0], t[0][1]))
+        entries = _filter_unmapped_record_entries(entries, icons)
+
+        if not entries:
+            continue
 
         if len(entries) == 1:
             main_key, main_qty = entries[0]

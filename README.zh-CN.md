@@ -85,9 +85,13 @@ docker run -d \
 - 同点位普通材料忽略（默认开启）：`MYSEKAI_IGNORE_BASE_MATERIALS=1`
   - 同点位有 `id=1` 且存在 `id=2..5` 时隐藏 `id=1`
   - 同点位有 `id=6` 且存在 `id=7..12` 时隐藏 `id=6`
-- site5/site6 已内置校准参数：
-  - site5 等效：`SCALE_DELTA≈+12/+12`、`OFFSET_DELTA≈+90/+170`
-  - site6 等效：`SCALE_DELTA≈+12/+12`、`OFFSET_DELTA≈+90/+170`
+- 兜底图标目前仅保留两类：钻石（`mysekai_material:12`）与蓝图碎片（`mysekai_item:7`）
+- 未映射的唱片资源会在渲染时直接跳过，不再绘制黑点占位
+- 当前内置固化参数：
+  - site5：`world_bounds=(-30,29,-23,75)`、`scale_add=(25.5,25.5)`、`offset_add=(0,-90)`
+  - site6：`world_bounds=(-30,29,-20,68)`、`scale_add=(16.6,16.2)`、`offset_add=(20,120)`
+  - site7：`world_bounds=(-30,29,-28,75)`、`scale_add=(19,19)`、`offset_add=(-60,20)`
+  - site8：`world_bounds=(-30,29,-29,70)`、`scale_add=(16.6,16.2)`、`offset_add=(20,-120)`
 
 ## 虚拟钻石通知测试
 
