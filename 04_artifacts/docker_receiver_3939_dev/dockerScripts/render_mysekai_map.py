@@ -12,20 +12,14 @@ SITE_CONFIG = {
         "bg": "grassland.png",
         "transform": "zx_neg",
         "world_bounds": (-30.0, 29.0, -23.0, 75.0),
-        # Calibrated default aligned with site6 tuning strategy:
-        # equivalent to SCALE_DELTA ~= +17/+17 and OFFSET_DELTA ~= +0/-70.
         "scale_add": (25.5, 25.5),
-        "offset_add": (30.0, -70.0),
+        "offset_add": (0.0, -90.0),
     },
-    # Beach map: lift all overlays by ~12.5% of 1080p background height (~135px).
     6: {
         "name": "Map 2",
         "bg": "beach.png",
         "transform": "x_negz",
         "world_bounds": (-30.0, 29.0, -20.0, 68.0),
-        # Calibrated default for stable query rendering:
-        # equivalent to WORLD_HALF_X=30, WORLD_HALF_Z=68 with
-        # SCALE_DELTA ~= +12/+12 and OFFSET_DELTA ~= +90/+170.
         "scale_add": (16.6, 16.2),
         "offset_add": (20.0, 120.0),
     },
@@ -90,8 +84,6 @@ ASSET_ICON_TO_FILE = {
 
 FALLBACK_ICON_MAP = {
     ("mysekai_material", 12): "Diamond.png",
-    ("mysekai_item", 7): "Blueprint_Scrap.png",
-    ("mysekai_music_record", 79): "Extra_Record.png",
 }
 
 
@@ -312,10 +304,6 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
     scale_z = base_scale + cfg["scale_add"][1]
     scale_x += _env_float(f"SITE{site_id}_SCALE_X_DELTA", 0.0)
     scale_z += _env_float(f"SITE{site_id}_SCALE_Z_DELTA", 0.0)
-
-    # Fixed-origin projection: world coordinate (0,0) maps to image center
-    # plus configured/manual offsets. This keeps identical coordinates stable
-    # across different json packets.
     offset_x = (bg_w / 2.0) + cfg["offset_add"][0]
     offset_z = (bg_h / 2.0) + cfg["offset_add"][1]
     offset_x += _env_float(f"SITE{site_id}_OFFSET_X_DELTA", 0.0)

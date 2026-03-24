@@ -64,8 +64,8 @@ SITE_LABELS = {
 }
 SITE_LABELS_CN = {
     5: "初始空地",
-    7: "烂漫花田",
     6: "心愿沙滩",
+    7: "烂漫花田",
     8: "忘却之所",
 }
 ALL_SITE_IDS = tuple(sorted(SITE_LABELS.keys()))
@@ -593,7 +593,9 @@ def _render_map_for_plugin_query(json_path, mysekai_user_id, site_ids):
                 (proc.stderr or proc.stdout or "render_failed").strip(),
             )
 
-    prune_old_files(map_dir, "mysekai_user*_query_*_site*.png", PLUGIN_QUERY_IMAGE_RETENTION)
+    prune_old_files(
+        map_dir, "mysekai_user*_query_*_site*.png", PLUGIN_QUERY_IMAGE_RETENTION
+    )
     return image_paths, "ok" if image_paths else "render_failed"
 
 
@@ -696,7 +698,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 )
                 return
 
-            image_urls = [_build_public_image_url(os.path.basename(p)) for p in image_paths]
+            image_urls = [
+                _build_public_image_url(os.path.basename(p)) for p in image_paths
+            ]
             # Query text policy:
             # - full-site query: no text
             # - single-site query: show localized site name only
