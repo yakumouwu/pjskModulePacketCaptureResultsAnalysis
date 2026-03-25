@@ -25,6 +25,9 @@ This repository provides local and Docker receivers for:
 
 Build:
 
+Note:
+- The Dockerfile now switches Debian `apt` sources to the Aliyun mirror to make package installation faster in mainland China environments.
+
 ```bash
 docker build -t pjsk-receiver:latest .
 ```

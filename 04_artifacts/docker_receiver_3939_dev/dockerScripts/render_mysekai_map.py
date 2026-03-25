@@ -365,7 +365,7 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
                 )
             text = str(main_qty)
             tx = px + (icon_size // 2) - 2
-            ty = py + (icon_size // 3)
+            ty = py + (icon_size // 6)
             for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                 draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
             draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
@@ -388,7 +388,7 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
                     )
                 text = str(qty)
                 tx = ix + (icon_size // 2) - 2
-                ty = iy + (icon_size // 3)
+                ty = iy + (icon_size // 6)
                 for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                     draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
                 draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)

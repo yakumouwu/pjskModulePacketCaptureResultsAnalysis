@@ -7,6 +7,9 @@
 
 ## 构建镜像
 
+说明：
+- Dockerfile 中的 Debian `apt` 源已切换为阿里云镜像，以减少国内环境构建时字体包下载过慢的问题。
+
 ```bash
 docker build -t pjsk-receiver:latest .
 ```

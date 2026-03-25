@@ -7,6 +7,9 @@ Recommended deployment mode: also bind-mount the host script directory to `/app/
 
 ## Build
 
+Note:
+- The Dockerfile now rewrites Debian `apt` sources to the Aliyun mirror to reduce slow package downloads in mainland China environments.
+
 ```bash
 docker build -t pjsk-receiver:latest .
 ```

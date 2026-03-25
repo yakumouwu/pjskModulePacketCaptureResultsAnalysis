@@ -25,6 +25,9 @@
 
 构建：
 
+说明：
+- Dockerfile 已将 Debian `apt` 源切到阿里云镜像，减少国内环境构建字体依赖时的等待时间。
+
 ```bash
 docker build -t pjsk-receiver:latest .
 ```
