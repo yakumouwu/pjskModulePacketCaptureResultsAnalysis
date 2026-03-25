@@ -1,8 +1,12 @@
-﻿FROM python:3.11-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
 COPY dockerScripts /app/dockerScripts
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com sssekai==0.7.62 Pillow
 
@@ -21,3 +25,4 @@ ENV TZ=Asia/Shanghai
 EXPOSE 3939
 
 CMD ["python", "/app/dockerScripts/import http.py"]
+

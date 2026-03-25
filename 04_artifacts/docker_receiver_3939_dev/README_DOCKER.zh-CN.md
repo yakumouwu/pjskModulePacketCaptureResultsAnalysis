@@ -2,6 +2,7 @@
 [English](./README_DOCKER.md) | [Project README](../../README.md) | [项目中文总览](../../README.zh-CN.md)
 
 运行脚本位于 `dockerScripts/`，构建镜像时会复制到容器内 `/app/dockerScripts`。
+镜像内会安装 `Noto Sans CJK` 字体，因此 `MYSEKAI_COUNT_FONT_SIZE` 与中文文本渲染会稳定生效。
 推荐部署方式：同时把宿主机脚本目录挂载到容器 `/app/dockerScripts`。这样后续只需要替换宿主机脚本并删除旧容器、重建新容器，不需要每次重新构建镜像。
 
 ## 构建镜像
@@ -52,7 +53,7 @@ docker run -d \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
-  -v /opt/pjsk-receiver-3939-dev/dockerScripts:/app/dockerScripts \
+  -v /opt/docker_receiver_3939_dev/dockerScripts:/app/dockerScripts \
   pjsk-receiver:latest
 ```
 
@@ -63,12 +64,12 @@ docker run -d \
 前提：
 - 镜像内 Python 依赖与基础环境没有变化
 - 你只修改了 `dockerScripts/` 下的脚本
-- 容器启动时已挂载：`-v /opt/pjsk-receiver-3939-dev/dockerScripts:/app/dockerScripts`
+- 容器启动时已挂载：`-v /opt/docker_receiver_3939_dev/dockerScripts:/app/dockerScripts`
 
 服务器示例流程：
 
 ```bash
-cd /opt/pjsk-receiver-3939-dev
+cd /opt/docker_receiver_3939_dev
 docker rm -f pjsk-receiver-dev
 docker run -d \
   --name pjsk-receiver-dev \
@@ -103,7 +104,7 @@ docker run -d \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
-  -v /opt/pjsk-receiver-3939-dev/dockerScripts:/app/dockerScripts \
+  -v /opt/docker_receiver_3939_dev/dockerScripts:/app/dockerScripts \
   pjsk-receiver:dev3939
 ```
 

@@ -1,7 +1,8 @@
-﻿# Mysekai/Suite Receiver Docker (Port 3939)
+# Mysekai/Suite Receiver Docker (Port 3939)
 [中文](./README_DOCKER.zh-CN.md) | [Project README](../../README.md) | [项目中文总览](../../README.zh-CN.md)
 
 Runtime scripts are stored in `dockerScripts/` and copied into the image as `/app/dockerScripts`.
+The image now installs `Noto Sans CJK`, so `MYSEKAI_COUNT_FONT_SIZE` and Chinese text rendering work consistently.
 Recommended deployment mode: also bind-mount the host script directory to `/app/dockerScripts`. That way, later script-only updates only require replacing host files and recreating the container, without rebuilding the image every time.
 
 ## Build
@@ -52,7 +53,7 @@ docker run -d \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
-  -v /opt/pjsk-receiver-3939-dev/dockerScripts:/app/dockerScripts \
+  -v /opt/docker_receiver_3939_dev/dockerScripts:/app/dockerScripts \
   pjsk-receiver:latest
 ```
 
@@ -63,12 +64,12 @@ Note: query rendering now uses a fixed-origin projection (map center is world `(
 Prerequisites:
 - Python dependencies and base runtime in the image have not changed
 - You only changed scripts under `dockerScripts/`
-- The container was started with `-v /opt/pjsk-receiver-3939-dev/dockerScripts:/app/dockerScripts`
+- The container was started with `-v /opt/docker_receiver_3939_dev/dockerScripts:/app/dockerScripts`
 
 Example server flow:
 
 ```bash
-cd /opt/pjsk-receiver-3939-dev
+cd /opt/docker_receiver_3939_dev
 docker rm -f pjsk-receiver-dev
 docker run -d \
   --name pjsk-receiver-dev \
@@ -103,7 +104,7 @@ docker run -d \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
-  -v /opt/pjsk-receiver-3939-dev/dockerScripts:/app/dockerScripts \
+  -v /opt/docker_receiver_3939_dev/dockerScripts:/app/dockerScripts \
   pjsk-receiver:dev3939
 ```
 

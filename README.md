@@ -1,4 +1,4 @@
-﻿# project-sekai
+# project-sekai
 [中文](./README.zh-CN.md) | [Docker English](./04_artifacts/docker_receiver_3939_dev/README_DOCKER.md) | [Docker 中文](./04_artifacts/docker_receiver_3939_dev/README_DOCKER.zh-CN.md)
 
 ## Overview
@@ -66,13 +66,14 @@ docker run -d \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
-  -v /opt/pjsk-receiver-3939-dev/dockerScripts:/app/dockerScripts \
+  -v /opt/docker_receiver_3939_dev/dockerScripts:/app/dockerScripts \
   pjsk-receiver:latest
 ```
 
 Optional:
 - place `mysekai_resource_map.json` in the proper config path to improve icon mapping accuracy
 - recommended: bind-mount host `dockerScripts/` to container `/app/dockerScripts` so script-only updates do not require rebuilding the image
+- the Docker image now bundles `Noto Sans CJK`, so `MYSEKAI_COUNT_FONT_SIZE` and Chinese text rendering behave consistently
 
 Data output:
 - raw payloads: `/data/raw_api/...`

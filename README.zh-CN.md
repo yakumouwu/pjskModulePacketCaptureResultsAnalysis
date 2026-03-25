@@ -66,13 +66,14 @@ docker run -d \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
-  -v /opt/pjsk-receiver-3939-dev/dockerScripts:/app/dockerScripts \
+  -v /opt/docker_receiver_3939_dev/dockerScripts:/app/dockerScripts \
   pjsk-receiver:latest
 ```
 
 可选：
 - 将 `mysekai_resource_map.json` 放到配置目录，以提升图标映射准确性。
 - 推荐把 `dockerScripts/` 宿主机目录挂载到容器 `/app/dockerScripts`，这样后续如果只改运行脚本，就不需要重新构建镜像。
+- Docker 镜像现已内置 `Noto Sans CJK` 字体，`MYSEKAI_COUNT_FONT_SIZE` 与中文文本渲染可稳定生效。
 
 数据输出：
 - 原始包：`/data/raw_api/...`
