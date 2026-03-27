@@ -70,6 +70,9 @@ docker run -d \
   pjsk-receiver:latest
 ```
 
+补充说明：
+- 推荐把宿主机 `dockerScripts/` 挂载到容器 `/app/dockerScripts`，这样纯脚本更新通常只需要删旧容器并重建容器，无需重建镜像
+
 数据输出：
 - 原始包：`/data/raw_api/...`
 - 解密 JSON：`/data/decoded_api/...`
@@ -185,6 +188,7 @@ python -m unittest discover -s tests -p "test_*.py" -v
 
 - 从 `04_artifacts/docker_receiver_3939_dev` 构建镜像
 - 运行时代码从 `dockerScripts/` 复制到 `/app/dockerScripts`
+- 如果宿主机 `dockerScripts/` 已挂载到 `/app/dockerScripts`，纯脚本更新通常只需要重建容器，无需重建镜像
 - 启动时至少包含：
   - `-p 3939:3939`
   - `-v /opt/pjsk-captures:/data`

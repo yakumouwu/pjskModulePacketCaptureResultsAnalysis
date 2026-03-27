@@ -72,6 +72,7 @@ docker run -d \
 
 Optional:
 - recommended: bind-mount host `dockerScripts/` to container `/app/dockerScripts` so script-only updates do not require rebuilding the image
+- when `dockerScripts/` is bind-mounted, script-only updates usually need only removing/recreating the container, not rebuilding the image
 - the code fallback and project deployment default both use `BOT_PUSH_MODE=group`
 
 Data output:
@@ -160,25 +161,6 @@ Run from repository root:
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-## Auto Commit Task (Local)
-
-- Existing scripts:
-- `auto_commit.bat`
-- `auto_commit.ps1`
-- Logs:
-- `logs/auto_commit.log`
-- `logs/auto_commit_runner.log`
-- Network note:
-- script retries `git pull --rebase` and `git push` automatically when remote access is unstable.
-
-Current coverage scope:
-- API routing detection (`extract_api_type`)
-- Diamond extraction (`find_diamond_hits`, mixed payload cases)
-- Window boundary and dedup cache logic (`get_refresh_window_id`, `filter_hits_for_current_window`, `cleanup_window_dedup_cache`)
-- Notification push behavior (`send_bot_message`, `push_text_with_optional_image`, retry/fallback/mode branches)
-- Notification pipeline light integration (`process_mysekai_notification` skip/hit branches)
-- HTTP endpoints (`GET /healthz`, `GET /upload.js`, `GET /api/plugin/mysekai/map`, `GET /api/plugin/mysekai/file`, `GET /`)
-
 ## LangBot Placeholder Plugin (Upload Smoke Test)
 
 - Source directory: `04_artifacts/langbot_plugin_placeholder/MysekaiQueryPlaceholder`
@@ -216,6 +198,7 @@ Validated behavior (current):
 
 - Build image from `04_artifacts/docker_receiver_3939_dev`
 - Runtime code is copied from `dockerScripts/` to `/app/dockerScripts`
+- If host `dockerScripts/` is bind-mounted to `/app/dockerScripts`, script-only updates usually require only recreating the container, not rebuilding the image
 - Run with at least:
   - `-p 3939:3939`
   - `-v /opt/pjsk-captures:/data`

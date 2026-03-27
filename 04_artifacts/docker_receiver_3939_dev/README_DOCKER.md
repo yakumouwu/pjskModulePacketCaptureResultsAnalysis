@@ -12,6 +12,7 @@ docker build -t pjsk-receiver:latest .
 Notes:
 - Receiver and NapCat must be in the same Docker network: `docker network create <YOUR_DOCKER_NETWORK>`.
 - IDs and tokens below are placeholders. Replace them in your own environment.
+- Recommended: bind-mount host `dockerScripts/` to container `/app/dockerScripts`; for script-only updates, recreating the container is usually enough and rebuilding the image is unnecessary.
 
 ```bash
 docker run -d \
@@ -57,6 +58,7 @@ Quick checks after start:
 ```bash
 docker logs -n 80 pjsk-receiver
 docker exec -it pjsk-receiver python -m pip show sssekai
+docker exec -it pjsk-receiver python -m sssekai -h
 curl -sS http://127.0.0.1:3939/healthz
 ```
 
@@ -67,14 +69,37 @@ docker exec -it langbot python -c "import urllib.request;print(urllib.request.ur
 docker exec -it langbot python -c "import urllib.request;print(urllib.request.urlopen('http://pjsk-receiver-dev:3939/api/plugin/mysekai/map?mysekai_user_id=<YOUR_MYSEKAI_USER_ID>&requester_qq=123456',timeout=20).read().decode())"
 ```
 
+Render test (generic single-site):
+
+```bash
+docker exec -it pjsk-receiver-dev /bin/sh -lc 'python /app/dockerScripts/render_mysekai_map.py \
+  /data/decoded_api/mysekai/<YOUR_SOURCE_JSON>.json \
+  /data/decoded_api/mysekai/maps/plugin_api/site_check.png \
+  /app/dockerScripts/mysekai_assets \
+  --site-id <5|6|7|8> --target-size 1024'
+```
+
 ## Container Paths
 
 - raw data: `/data/raw_api/...`
 - decoded json: `/data/decoded_api/...`
 - mysekai images: `/data/decoded_api/mysekai/maps/...`
 - logs: `/data/logs/receiver.log`
+- render settings:
+  - `MYSEKAI_MAP_IMAGE_SIZE`: output width
+  - `MYSEKAI_ICON_SIZE`: icon size
+  - `MYSEKAI_COUNT_FONT_SIZE`: count text size
+  - `MYSEKAI_ICON_SPREAD`: spread radius for multi-resource points
+  - `MYSEKAI_IGNORE_BASE_MATERIALS`: whether to hide base materials on the same coordinate
+  - `SITE<id>_WORLD_HALF_X` / `SITE<id>_WORLD_HALF_Z`: fixed per-site world span for stable projection from world coordinates to map coordinates
+  - `SITE<id>_SCALE_X_DELTA` / `SITE<id>_SCALE_Z_DELTA`: per-site scale fine-tuning
+  - `SITE<id>_OFFSET_X_DELTA` / `SITE<id>_OFFSET_Z_DELTA`: per-site offset fine-tuning
 - notification hits: `/data/notifications/hits/`
 - notification events: `/data/notifications/diamond_notifications.jsonl`
+- health endpoint: `GET /healthz`
+- plugin map query endpoint: `GET /api/plugin/mysekai/map`
+- plugin image file endpoint: `GET /api/plugin/mysekai/file?name=<file_name>`
+- `BOT_TOKEN` is the NapCat HTTP server token (Authorization Bearer token)
 
 ## Notification And Render Rules
 
@@ -85,17 +110,6 @@ docker exec -it langbot python -c "import urllib.request;print(urllib.request.ur
 - default message mode is `text+image`
 - if image push fails, the receiver falls back to text push
 - plugin query rendering is separate from automatic notification: if a usable full mysekai packet exists, plugin query render can proceed without diamond hits
-
-## Render Parameters
-
-- `MYSEKAI_MAP_IMAGE_SIZE`: output width
-- `MYSEKAI_ICON_SIZE`: icon size
-- `MYSEKAI_COUNT_FONT_SIZE`: count text size
-- `MYSEKAI_ICON_SPREAD`: spread radius for multi-resource points
-- `MYSEKAI_IGNORE_BASE_MATERIALS`: whether to hide base materials on the same coordinate
-- `SITE<id>_WORLD_HALF_X` / `SITE<id>_WORLD_HALF_Z`: fixed per-site world span for stable projection from world coordinates to map coordinates
-- `SITE<id>_SCALE_X_DELTA` / `SITE<id>_SCALE_Z_DELTA`: per-site scale fine-tuning
-- `SITE<id>_OFFSET_X_DELTA` / `SITE<id>_OFFSET_Z_DELTA`: per-site offset fine-tuning
 
 ## Plugin Query API
 

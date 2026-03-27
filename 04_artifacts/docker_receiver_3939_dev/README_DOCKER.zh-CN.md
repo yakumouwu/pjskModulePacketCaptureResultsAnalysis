@@ -12,6 +12,7 @@ docker build -t pjsk-receiver:latest .
 注意：
 - Receiver 与 NapCat 必须在同一个 Docker 网络中：`docker network create <YOUR_DOCKER_NETWORK>`。
 - 文档中的 ID/Token 均为占位，请在实际部署时替换为你自己的参数。
+- 推荐把宿主机 `dockerScripts/` 挂载到容器 `/app/dockerScripts`；如果只是脚本更新，通常只需要重建容器，无需重建镜像。
 
 ```bash
 docker run -d \
