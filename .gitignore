@@ -36,3 +36,4 @@ reference/
 tests/**/__pycache__/
 04_artifacts/**/__pycache__/
 04_artifacts/**/*.tar
+.gitnexus
