@@ -33,7 +33,7 @@ BOT_PUSH_URL = os.environ.get(
     "BOT_PUSH_URL",
     os.environ.get("BOT_PUSH_BASE_URL", "http://napcat:3000"),
 ).rstrip("/")
-BOT_PUSH_MODE = os.environ.get("BOT_PUSH_MODE", "private").strip().lower()
+BOT_PUSH_MODE = os.environ.get("BOT_PUSH_MODE", "group").strip().lower()
 BOT_TARGET_ID = os.environ.get("BOT_TARGET_ID", "0").strip()
 NOTIFICATION_USER_LABEL = os.environ.get("NOTIFICATION_USER_LABEL", "player").strip()
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "").strip()

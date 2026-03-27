@@ -7,7 +7,6 @@
 !README.zh-CN.md
 !batchAnalysis.bat
 AGENTS.md
-00_docs/MCP_SKILL_PLAN.md
 
 # Keep workflow files only.
 !.github/
@@ -27,6 +26,7 @@ AGENTS.md
 
 # Keep TODO local only.
 00_docs/TODO.md
+00_docs/MCP_SKILL_PLAN.md
 
 # Local reference repository (not part of project source).
 reference/

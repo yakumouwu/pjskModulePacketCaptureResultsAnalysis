@@ -72,6 +72,7 @@ docker run -d \
 
 可选：
 - 推荐把 `dockerScripts/` 宿主机目录挂载到容器 `/app/dockerScripts`，这样后续如果只改运行脚本，就不需要重新构建镜像。
+- 当前代码回退值与项目部署约定均默认使用 `BOT_PUSH_MODE=group`。
 
 数据输出：
 - 原始包：`/data/raw_api/...`
@@ -85,6 +86,38 @@ docker run -d \
 - 渲染投影规则：固定零点模式（地图中心 = 世界坐标 `(0,0)`），跨包一致性依赖固定世界尺度参数
 - 单图渲染现已保持底图原始比例（`16:9`），`MYSEKAI_MAP_IMAGE_SIZE` 表示输出目标宽度
 - 同点位普通材料忽略（默认开启）：`MYSEKAI_IGNORE_BASE_MATERIALS=1`
+
+## 关键运行参数
+
+推送与通知：
+- `BOT_PUSH_MODE`：当前代码回退值为 `group`，项目部署也默认按群推送使用；如需私聊推送可显式设为 `private`
+- `BOT_MESSAGE_MODE`：支持 `text`、`image`、`text+image`；当前默认策略是 `text+image`，图片发送失败时会回退到纯文本
+- `BOT_PUSH_RETRY`：NapCat 推送重试次数
+- `NOTIFICATION_WINDOW_CACHE_HOURS`：窗口去重缓存保留时长
+- `NOTIFICATION_HIT_RETENTION`：命中归档 json 保留数量
+- `NOTIFICATION_EVENT_RETENTION_LINES`：`diamond_notifications.jsonl` 最大保留行数
+- 自动通知触发规则：只在检测到钻石命中（`mysekai_material`, `id=12`）时触发；同一用户在 `05:00-17:00` 或 `17:00-次日05:00` 窗口内仅首次命中会生成并推送图片，后续命中直接跳过
+
+插件查询：
+- `PLUGIN_API_KEY`：可选鉴权密钥，通过请求头 `X-API-Key` 校验
+- `PLUGIN_QUERY_IMAGE_RETENTION`：插件查询渲染图保留数量
+- 查询文本规则：
+  - 不带 `site_id` 的全量查询：返回空文本
+  - 带 `site_id` 的单图查询：仅返回中文地图名
+- 成功响应除 `text` 与 `images` 外，还会带 `source_json`，用于定位本次渲染实际使用的源数据文件
+
+渲染尺寸：
+- `MYSEKAI_MAP_IMAGE_SIZE`：单图渲染输出目标宽度
+- `MYSEKAI_ICON_SIZE`：图标尺寸
+- `MYSEKAI_COUNT_FONT_SIZE`：数量文字尺寸
+- `MYSEKAI_ICON_SPREAD`：同点多资源图标扩散半径
+- `MYSEKAI_IGNORE_BASE_MATERIALS=1`：同点位存在高阶材料时隐藏普通材料
+
+站点级校准参数：
+- `SITE<id>_WORLD_HALF_X` / `SITE<id>_WORLD_HALF_Z`：站点固定世界半宽/半高，用于把世界坐标稳定投影到底图，减少跨包漂移
+- `SITE<id>_SCALE_X_DELTA` / `SITE<id>_SCALE_Z_DELTA`：站点级横向/纵向缩放微调
+- `SITE<id>_OFFSET_X_DELTA` / `SITE<id>_OFFSET_Z_DELTA`：站点级横向/纵向偏移微调
+- 当前站点范围：`5,6,7,8`
 
 ## 虚拟钻石通知测试
 

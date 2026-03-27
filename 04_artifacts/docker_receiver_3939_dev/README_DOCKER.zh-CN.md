@@ -12,6 +12,7 @@ docker build -t pjsk-receiver:latest .
 注意：
 - Receiver 与 NapCat 必须在同一个 Docker 网络中：`docker network create <YOUR_DOCKER_NETWORK>`。
 - 文档中的 ID/Token 均为占位，请在实际部署时替换为你自己的参数。
+- `BOT_PUSH_MODE` 在代码中的回退值已为 `group`；不传该变量时会默认按群推送处理。
 
 ```bash
 docker run -d \
@@ -90,12 +91,25 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'python /app/dockerScripts/render_
   - `MYSEKAI_COUNT_FONT_SIZE`：数量文字尺寸
   - `MYSEKAI_ICON_SPREAD`：同点多资源图标扩散半径
   - `MYSEKAI_IGNORE_BASE_MATERIALS`：是否忽略同点位普通材料
+  - `SITE<id>_WORLD_HALF_X` / `SITE<id>_WORLD_HALF_Z`：站点固定世界尺度，控制世界坐标到地图坐标的稳定投影
+  - `SITE<id>_SCALE_X_DELTA` / `SITE<id>_SCALE_Z_DELTA`：站点级缩放微调
+  - `SITE<id>_OFFSET_X_DELTA` / `SITE<id>_OFFSET_Z_DELTA`：站点级偏移微调
 - 自动通知归档：`/data/notifications/hits/`
 - 通知事件日志：`/data/notifications/diamond_notifications.jsonl`
 - 健康检查接口：`GET /healthz`
 - 插件地图查询接口：`GET /api/plugin/mysekai/map`
 - 插件图片文件接口：`GET /api/plugin/mysekai/file?name=<file_name>`
 - `BOT_TOKEN` 为 NapCat HTTP Server Token（Bearer Token）
+
+## 通知与渲染规则
+
+- 自动通知只在检测到钻石命中时触发：`resourceType=mysekai_material` 且 `resourceId=12`
+- 去重窗口固定为本地时间 `05:00-17:00` 与 `17:00-次日05:00`
+- 同一用户在同一窗口内仅首次钻石命中会触发渲染与推送；同窗口内后续命中不会再次出图或推送
+- 默认推送模式为 `group`
+- 默认消息模式为 `text+image`
+- 若图片推送失败，会自动回退为纯文本推送
+- 插件主动查询与自动通知分离：插件查询只要存在可用全量 mysekai 包即可渲染，不要求钻石命中
 
 ## 插件查询 API
 
@@ -105,7 +119,7 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'python /app/dockerScripts/render_
   - `requester_qq`（可选）
   - `site_id`（可选，取值 `5,6,7,8`，分别对应 `初始空地/心愿沙滩/烂漫花田/忘却之所`）
 - 成功响应格式：
-  - `{ "ok": true, "message": "ok", "data": { "text": "...", "images": ["http://..."] } }`
+  - `{ "ok": true, "message": "ok", "data": { "text": "...", "images": ["http://..."], "source_json": "..." } }`
   - 文本规则：
     - 全量查询（不带 `site_id`）返回空文本
     - 单图查询（带 `site_id`）仅显示中文地图名（例如：`地图：心愿沙滩`）

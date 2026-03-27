@@ -72,6 +72,7 @@ docker run -d \
 
 Optional:
 - recommended: bind-mount host `dockerScripts/` to container `/app/dockerScripts` so script-only updates do not require rebuilding the image
+- the code fallback and project deployment default both use `BOT_PUSH_MODE=group`
 
 Data output:
 - raw payloads: `/data/raw_api/...`
@@ -85,6 +86,38 @@ Data output:
 - renderer projection rule: fixed-origin mode is used (map center = world `(0,0)`); lock `SITE<id>_WORLD_HALF_X/Z` for stable cross-packet alignment
 - single-site render output now preserves the source map aspect ratio (`16:9`), and `MYSEKAI_MAP_IMAGE_SIZE` is treated as target output width
 - same-coordinate base material ignore (enabled by default): `MYSEKAI_IGNORE_BASE_MATERIALS=1`
+
+## Key Runtime Settings
+
+Push and notification:
+- `BOT_PUSH_MODE`: current code fallback is `group`, and project deployment also defaults to group push; set `private` explicitly if needed
+- `BOT_MESSAGE_MODE`: `text`, `image`, or `text+image`; current default strategy is `text+image`, and image push failure falls back to text
+- `BOT_PUSH_RETRY`: retry count for NapCat push
+- `NOTIFICATION_WINDOW_CACHE_HOURS`: retention for the in-memory/on-disk dedup gate cache
+- `NOTIFICATION_HIT_RETENTION`: how many raw notification hit json files to keep
+- `NOTIFICATION_EVENT_RETENTION_LINES`: max retained lines in `diamond_notifications.jsonl`
+- automatic notification trigger: only diamond hits (`mysekai_material`, `id=12`) can trigger render/push; for each user, only the first hit inside `05:00-17:00` or `17:00-next 05:00` is allowed through
+
+Plugin query:
+- `PLUGIN_API_KEY`: optional auth key checked via `X-API-Key`
+- `PLUGIN_QUERY_IMAGE_RETENTION`: retained query render image count
+- query text policy:
+  - full query without `site_id`: empty text
+  - single-site query with `site_id`: localized Chinese map name only
+- successful responses also include `source_json`, which shows which decoded mysekai file was actually used for the render
+
+Render sizing:
+- `MYSEKAI_MAP_IMAGE_SIZE`: target output width for single-site render
+- `MYSEKAI_ICON_SIZE`: icon size
+- `MYSEKAI_COUNT_FONT_SIZE`: count text size
+- `MYSEKAI_ICON_SPREAD`: spread radius for multiple resources on the same coordinate
+- `MYSEKAI_IGNORE_BASE_MATERIALS=1`: hide base materials when upgraded variants exist on the same coordinate
+
+Per-site calibration:
+- `SITE<id>_WORLD_HALF_X` / `SITE<id>_WORLD_HALF_Z`: fixed world half-span used to project world coordinates into the map; this stabilizes cross-packet alignment
+- `SITE<id>_SCALE_X_DELTA` / `SITE<id>_SCALE_Z_DELTA`: fine-tune horizontal/vertical projection scale for one site
+- `SITE<id>_OFFSET_X_DELTA` / `SITE<id>_OFFSET_Z_DELTA`: fine-tune projected icon offset for one site
+- supported site ids: `5,6,7,8`
 
 ## Virtual Diamond Notification Test
 

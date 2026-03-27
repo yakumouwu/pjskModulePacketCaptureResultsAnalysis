@@ -12,6 +12,7 @@ docker build -t pjsk-receiver:latest .
 Notes:
 - Receiver and NapCat must be in the same Docker network: `docker network create <YOUR_DOCKER_NETWORK>`.
 - IDs and tokens below are placeholders. Replace them in your own environment.
+- `BOT_PUSH_MODE` now falls back to `group` in code; if you omit the variable, group push is used by default.
 
 ```bash
 docker run -d \
@@ -76,6 +77,16 @@ docker exec -it langbot python -c "import urllib.request;print(urllib.request.ur
 - notification hits: `/data/notifications/hits/`
 - notification events: `/data/notifications/diamond_notifications.jsonl`
 
+## Notification And Render Rules
+
+- automatic notification triggers only on diamond hits: `resourceType=mysekai_material` and `resourceId=12`
+- dedup windows are fixed to local time `05:00-17:00` and `17:00-next 05:00`
+- for the same user, only the first diamond hit in one window can render and push; later hits in the same window are skipped
+- default push mode is `group`
+- default message mode is `text+image`
+- if image push fails, the receiver falls back to text push
+- plugin query rendering is separate from automatic notification: if a usable full mysekai packet exists, plugin query render can proceed without diamond hits
+
 ## Render Parameters
 
 - `MYSEKAI_MAP_IMAGE_SIZE`: output width
@@ -83,6 +94,9 @@ docker exec -it langbot python -c "import urllib.request;print(urllib.request.ur
 - `MYSEKAI_COUNT_FONT_SIZE`: count text size
 - `MYSEKAI_ICON_SPREAD`: spread radius for multi-resource points
 - `MYSEKAI_IGNORE_BASE_MATERIALS`: whether to hide base materials on the same coordinate
+- `SITE<id>_WORLD_HALF_X` / `SITE<id>_WORLD_HALF_Z`: fixed per-site world span for stable projection from world coordinates to map coordinates
+- `SITE<id>_SCALE_X_DELTA` / `SITE<id>_SCALE_Z_DELTA`: per-site scale fine-tuning
+- `SITE<id>_OFFSET_X_DELTA` / `SITE<id>_OFFSET_Z_DELTA`: per-site offset fine-tuning
 
 ## Plugin Query API
 
@@ -92,7 +106,10 @@ docker exec -it langbot python -c "import urllib.request;print(urllib.request.ur
   - `requester_qq`
   - `site_id` (`5,6,7,8`)
 - success response:
-  - `{ "ok": true, "message": "ok", "data": { "text": "...", "images": ["http://..."] } }`
+  - `{ "ok": true, "message": "ok", "data": { "text": "...", "images": ["http://..."], "source_json": "..." } }`
+  - text policy:
+    - full query without `site_id`: empty text
+    - single-site query with `site_id`: localized Chinese site name only
 
 ## NapCat API Baseline
 
