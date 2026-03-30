@@ -115,7 +115,8 @@ Render sizing:
 - `MYSEKAI_IGNORE_BASE_MATERIALS=1`: hide base materials when upgraded variants exist on the same coordinate
 - icon coverage:
   - `material` uses its own icon set and is no longer treated as `mysekai_material`
-  - unmapped `mysekai_music_record`, unmapped `material`, and unmapped `mysekai_fixture` are skipped instead of rendering placeholder dots
+  - `mysekai_music_record` uses the shared `Extra_Record.png` icon
+  - unmapped `material` and unmapped `mysekai_fixture` are skipped instead of rendering placeholder dots
   - extra icons can be dropped into `04_artifacts/docker_receiver_3939_dev/dockerScripts/mysekai_assets/icon/`
   - file naming for direct pickup: `material_<id>.png`, `mysekai_fixture_<id>.png`, or `fixture_<id>.png`
 

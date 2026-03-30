@@ -92,7 +92,8 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'python /app/dockerScripts/render_
   - `MYSEKAI_ICON_SPREAD`：同点多资源图标扩散半径
   - `MYSEKAI_IGNORE_BASE_MATERIALS`：是否忽略同点位普通材料
   - `material` 使用独立图标组，不再按 `mysekai_material` 解释
-  - 未映射的 `mysekai_music_record`、未映射的 `material`、未映射的 `mysekai_fixture` 会直接跳过，不再画占位点
+  - `mysekai_music_record` 统一使用共享图标 `Extra_Record.png`
+  - 未映射的 `material`、未映射的 `mysekai_fixture` 会直接跳过，不再画占位点
   - 额外图标可放到 `/app/dockerScripts/mysekai_assets/icon/`
   - 直接识别的文件名：`material_<id>.png`、`mysekai_fixture_<id>.png`、`fixture_<id>.png`
   - `SITE<id>_WORLD_HALF_X` / `SITE<id>_WORLD_HALF_Z`：站点固定世界尺度，控制世界坐标到地图坐标的稳定投影

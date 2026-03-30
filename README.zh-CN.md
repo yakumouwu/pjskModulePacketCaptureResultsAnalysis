@@ -113,7 +113,8 @@ docker run -d \
 - `MYSEKAI_IGNORE_BASE_MATERIALS=1`：同点位存在高阶材料时隐藏普通材料
 - 图标覆盖补充：
   - `material` 使用独立图标组，不再按 `mysekai_material` 解释
-  - 未映射的 `mysekai_music_record`、未映射的 `material`、未映射的 `mysekai_fixture` 会直接跳过，不再画占位点
+  - `mysekai_music_record` 统一使用共享图标 `Extra_Record.png`
+  - 未映射的 `material`、未映射的 `mysekai_fixture` 会直接跳过，不再画占位点
   - 额外图标可放到 `04_artifacts/docker_receiver_3939_dev/dockerScripts/mysekai_assets/icon/`
   - 直接识别的文件名：`material_<id>.png`、`mysekai_fixture_<id>.png`、`fixture_<id>.png`
 

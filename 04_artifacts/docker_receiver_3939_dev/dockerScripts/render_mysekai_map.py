@@ -6,6 +6,32 @@ from collections import OrderedDict
 
 from PIL import Image, ImageDraw, ImageFont
 
+SUPPORTED_RESOURCE_TYPES = {
+    "mysekai_material",
+    "mysekai_item",
+    "mysekai_music_record",
+    "material",
+    "mysekai_fixture",
+}
+
+SKIP_UNMAPPED_RESOURCE_TYPES = {
+    "mysekai_music_record",
+    "material",
+    "mysekai_fixture",
+}
+
+DYNAMIC_ICON_PATTERNS = {
+    "material": ["material_{id}.png"],
+    "mysekai_fixture": ["mysekai_fixture_{id}.png", "fixture_{id}.png"],
+}
+
+TYPE_FALLBACK_ICON_FILES = {
+    "mysekai_music_record": "Extra_Record.png",
+}
+
+_RESOURCE_ICON_MAP_CACHE = None
+_ICON_CACHE_BY_DIR = {}
+
 SITE_CONFIG = {
     5: {
         "name": "Map 1",
@@ -155,16 +181,22 @@ def _find_map_json():
 
 
 def _load_resource_icon_map():
+    global _RESOURCE_ICON_MAP_CACHE
+    if _RESOURCE_ICON_MAP_CACHE is not None:
+        return dict(_RESOURCE_ICON_MAP_CACHE)
+
     mapping = dict(FALLBACK_ICON_MAP)
     map_json = _find_map_json()
     if not map_json:
-        return mapping
+        _RESOURCE_ICON_MAP_CACHE = dict(mapping)
+        return dict(_RESOURCE_ICON_MAP_CACHE)
 
     try:
         with open(map_json, "r", encoding="utf-8") as f:
             cfg = json.load(f)
     except Exception:
-        return mapping
+        _RESOURCE_ICON_MAP_CACHE = dict(mapping)
+        return dict(_RESOURCE_ICON_MAP_CACHE)
 
     for k, meta in cfg.get("material_meta", {}).items():
         try:
@@ -196,12 +228,15 @@ def _load_resource_icon_map():
         if icon_file:
             mapping[("mysekai_music_record", rid)] = icon_file
 
-    return mapping
+    _RESOURCE_ICON_MAP_CACHE = dict(mapping)
+    return dict(_RESOURCE_ICON_MAP_CACHE)
 
 
 def _load_icons(icon_dir, resource_icon_map):
-    cache = {}
+    cache = _ICON_CACHE_BY_DIR.setdefault(icon_dir, {})
     for key, fname in resource_icon_map.items():
+        if key in cache:
+            continue
         path = os.path.join(icon_dir, fname)
         if os.path.isfile(path):
             cache[key] = Image.open(path).convert("RGBA")
@@ -209,27 +244,36 @@ def _load_icons(icon_dir, resource_icon_map):
 
 
 def _try_load_dynamic_icon(icon_dir, cache, key):
+    if key in cache:
+        return cache[key]
+
     rtype, rid = key
-    candidates = []
-    if rtype == "material":
-        candidates = [f"material_{rid}.png"]
-    elif rtype == "mysekai_fixture":
-        candidates = [f"mysekai_fixture_{rid}.png", f"fixture_{rid}.png"]
-    else:
+    candidates = DYNAMIC_ICON_PATTERNS.get(rtype)
+    if not candidates:
         return None
 
-    for fname in candidates:
+    for pattern in candidates:
+        fname = pattern.format(id=rid)
         path = os.path.join(icon_dir, fname)
         if os.path.isfile(path):
             cache[key] = Image.open(path).convert("RGBA")
             return cache[key]
+    cache[key] = None
     return None
 
 
 def _get_icon(icon_dir, cache, key):
     icon = cache.get(key)
-    if icon is not None:
+    if key in cache:
         return icon
+
+    fallback_file = TYPE_FALLBACK_ICON_FILES.get(key[0])
+    if fallback_file:
+        path = os.path.join(icon_dir, fallback_file)
+        if os.path.isfile(path):
+            cache[key] = Image.open(path).convert("RGBA")
+            return cache[key]
+
     return _try_load_dynamic_icon(icon_dir, cache, key)
 
 
@@ -243,13 +287,7 @@ def _extract_points(mysekai_json):
         coords = points_by_site.setdefault(site_id, {})
         for drop in hm.get("userMysekaiSiteHarvestResourceDrops", []):
             resource_type = str(drop.get("resourceType", ""))
-            if resource_type not in (
-                "mysekai_material",
-                "mysekai_item",
-                "mysekai_music_record",
-                "material",
-                "mysekai_fixture",
-            ):
+            if resource_type not in SUPPORTED_RESOURCE_TYPES:
                 continue
             x = drop.get("positionX")
             z = drop.get("positionZ")
@@ -293,11 +331,7 @@ def _filter_unmapped_special_entries(entries, icons, icon_dir):
     filtered = []
     for key, qty in entries:
         icon = _get_icon(icon_dir, icons, key)
-        if icon is None and key[0] in (
-            "mysekai_music_record",
-            "material",
-            "mysekai_fixture",
-        ):
+        if icon is None and key[0] in SKIP_UNMAPPED_RESOURCE_TYPES:
             continue
         filtered.append((key, qty))
     return filtered
@@ -363,10 +397,8 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
         pz = offset_z + (cz * scale_z)
         return int(px), int(pz)
 
-    item_pixels = []
     for (cx, cz), drops in coords.items():
         px, py = coord_to_px(cx, cz)
-        item_pixels.append((px, py))
 
         stat = {}
         for d in drops:
