@@ -141,8 +141,5 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'python /app/dockerScripts/render_
   - `{"type":"image","data":{"file":"<path|url|base64>"}}`
 
 ## 图标命名规则
-- mysekai_material 与 mysekai_item 支持按 iconAssetbundleName 直接覆盖图标，例如 item_plant_4.png。
-- mysekai_fixture ?????????????????? mysekai_fixture_<id>.png ? fixture_<id>.png?
-- mysekai_fixture 同时支持简化命名（mysekai_fixture_<id>.png、
-- mysekai_fixture ?????????????????? mysekai_fixture_<id>.png ? fixture_<id>.png?
-
+- `mysekai_material` 与 `mysekai_item` 支持按 `iconAssetbundleName` 直接覆盖图标，例如 `item_plant_4.png`。
+- `mysekai_fixture` 支持简化命名，直接读取 `mysekai_fixture_<id>.png` 或 `fixture_<id>.png`。
