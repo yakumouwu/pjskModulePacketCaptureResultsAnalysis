@@ -227,3 +227,7 @@ Validated behavior (current):
   - `suite`
   - `mysekai`:
     - `/api/user/<uid>/mysekai?isForceAllReloadOnlyMysekai=True|False`
+
+## Icon Overrides
+- mysekai_material and mysekai_item now prefer local override files named after iconAssetbundleName, for example item_plant_4.png, before falling back to the shared built-in icon mapping.
+- mysekai_fixture now uses canonical local filenames such as mysekai_fixture_<id>.png or fixture_<id>.png.

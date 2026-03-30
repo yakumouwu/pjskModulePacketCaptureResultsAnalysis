@@ -217,3 +217,9 @@ python -m unittest discover -s tests -p "test_*.py" -v
   - `suite`
   - `mysekai`：
     - `/api/user/<uid>/mysekai?isForceAllReloadOnlyMysekai=True|False`
+
+## 图标覆盖规则
+- mysekai_material 与 mysekai_item 现在会优先尝试读取与 iconAssetbundleName 同名的本地图标文件，例如 item_plant_4.png，找不到时才回退到当前内置共享映射。
+- mysekai_fixture ?????????????????? mysekai_fixture_<id>.png ? fixture_<id>.png?
+- mysekai_fixture 现在同时支持简化命名（如 mysekai_fixture_<id>.png、
+- mysekai_fixture ?????????????????? mysekai_fixture_<id>.png ? fixture_<id>.png?

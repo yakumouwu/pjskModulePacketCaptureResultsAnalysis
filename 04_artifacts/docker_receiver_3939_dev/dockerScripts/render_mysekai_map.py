@@ -22,7 +22,10 @@ SKIP_UNMAPPED_RESOURCE_TYPES = {
 
 DYNAMIC_ICON_PATTERNS = {
     "material": ["material_{id}.png"],
-    "mysekai_fixture": ["mysekai_fixture_{id}.png", "fixture_{id}.png"],
+    "mysekai_fixture": [
+        "mysekai_fixture_{id}.png",
+        "fixture_{id}.png",
+    ],
 }
 
 TYPE_FALLBACK_ICON_FILES = {
@@ -30,6 +33,7 @@ TYPE_FALLBACK_ICON_FILES = {
 }
 
 _RESOURCE_ICON_MAP_CACHE = None
+_RESOURCE_ASSET_KEY_CACHE = None
 _ICON_CACHE_BY_DIR = {}
 
 SITE_CONFIG = {
@@ -232,6 +236,42 @@ def _load_resource_icon_map():
     return dict(_RESOURCE_ICON_MAP_CACHE)
 
 
+def _load_resource_asset_keys():
+    global _RESOURCE_ASSET_KEY_CACHE
+    if _RESOURCE_ASSET_KEY_CACHE is not None:
+        return dict(_RESOURCE_ASSET_KEY_CACHE)
+
+    asset_keys = {}
+    map_json = _find_map_json()
+    if not map_json:
+        _RESOURCE_ASSET_KEY_CACHE = dict(asset_keys)
+        return dict(_RESOURCE_ASSET_KEY_CACHE)
+
+    try:
+        with open(map_json, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    except Exception:
+        _RESOURCE_ASSET_KEY_CACHE = dict(asset_keys)
+        return dict(_RESOURCE_ASSET_KEY_CACHE)
+
+    for rtype, section in (
+        ("mysekai_material", "material_meta"),
+        ("mysekai_item", "item_meta"),
+        ("mysekai_music_record", "music_record_meta"),
+    ):
+        for k, meta in cfg.get(section, {}).items():
+            try:
+                rid = int(k)
+            except Exception:
+                continue
+            asset_key = str(meta.get("icon", "")).strip()
+            if asset_key:
+                asset_keys[(rtype, rid)] = asset_key
+
+    _RESOURCE_ASSET_KEY_CACHE = dict(asset_keys)
+    return dict(_RESOURCE_ASSET_KEY_CACHE)
+
+
 def _load_icons(icon_dir, resource_icon_map):
     cache = _ICON_CACHE_BY_DIR.setdefault(icon_dir, {})
     for key, fname in resource_icon_map.items():
@@ -266,6 +306,13 @@ def _get_icon(icon_dir, cache, key):
     icon = cache.get(key)
     if key in cache:
         return icon
+
+    asset_key = _load_resource_asset_keys().get(key)
+    if asset_key:
+        path = os.path.join(icon_dir, f"{asset_key}.png")
+        if os.path.isfile(path):
+            cache[key] = Image.open(path).convert("RGBA")
+            return cache[key]
 
     fallback_file = TYPE_FALLBACK_ICON_FILES.get(key[0])
     if fallback_file:

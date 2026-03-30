@@ -133,3 +133,7 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'python /app/dockerScripts/render_
 
 - `POST {BOT_PUSH_URL}/send_private_msg`
 - `POST {BOT_PUSH_URL}/send_group_msg`
+
+## Icon File Naming
+- mysekai_material and mysekai_item support direct override files named after iconAssetbundleName, such as item_plant_4.png.
+- mysekai_fixture uses canonical local filenames such as mysekai_fixture_<id>.png or fixture_<id>.png.
