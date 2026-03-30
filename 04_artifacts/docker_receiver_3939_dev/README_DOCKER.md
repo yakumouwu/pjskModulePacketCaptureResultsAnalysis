@@ -91,6 +91,10 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'python /app/dockerScripts/render_
   - `MYSEKAI_COUNT_FONT_SIZE`: count text size
   - `MYSEKAI_ICON_SPREAD`: spread radius for multi-resource points
   - `MYSEKAI_IGNORE_BASE_MATERIALS`: whether to hide base materials on the same coordinate
+  - `material` uses its own icon set and is no longer treated as `mysekai_material`
+  - unmapped `mysekai_music_record`, unmapped `material`, and unmapped `mysekai_fixture` are skipped instead of drawing placeholder dots
+  - extra icons can be added under `/app/dockerScripts/mysekai_assets/icon/`
+  - direct filename pickup is supported for `material_<id>.png`, `mysekai_fixture_<id>.png`, and `fixture_<id>.png`
   - `SITE<id>_WORLD_HALF_X` / `SITE<id>_WORLD_HALF_Z`: fixed per-site world span for stable projection from world coordinates to map coordinates
   - `SITE<id>_SCALE_X_DELTA` / `SITE<id>_SCALE_Z_DELTA`: per-site scale fine-tuning
   - `SITE<id>_OFFSET_X_DELTA` / `SITE<id>_OFFSET_Z_DELTA`: per-site offset fine-tuning

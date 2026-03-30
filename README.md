@@ -113,6 +113,11 @@ Render sizing:
 - `MYSEKAI_COUNT_FONT_SIZE`: count text size
 - `MYSEKAI_ICON_SPREAD`: spread radius for multiple resources on the same coordinate
 - `MYSEKAI_IGNORE_BASE_MATERIALS=1`: hide base materials when upgraded variants exist on the same coordinate
+- icon coverage:
+  - `material` uses its own icon set and is no longer treated as `mysekai_material`
+  - unmapped `mysekai_music_record`, unmapped `material`, and unmapped `mysekai_fixture` are skipped instead of rendering placeholder dots
+  - extra icons can be dropped into `04_artifacts/docker_receiver_3939_dev/dockerScripts/mysekai_assets/icon/`
+  - file naming for direct pickup: `material_<id>.png`, `mysekai_fixture_<id>.png`, or `fixture_<id>.png`
 
 Per-site calibration:
 - `SITE<id>_WORLD_HALF_X` / `SITE<id>_WORLD_HALF_Z`: fixed world half-span used to project world coordinates into the map; this stabilizes cross-packet alignment

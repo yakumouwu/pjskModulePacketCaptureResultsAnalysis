@@ -208,6 +208,31 @@ def _load_icons(icon_dir, resource_icon_map):
     return cache
 
 
+def _try_load_dynamic_icon(icon_dir, cache, key):
+    rtype, rid = key
+    candidates = []
+    if rtype == "material":
+        candidates = [f"material_{rid}.png"]
+    elif rtype == "mysekai_fixture":
+        candidates = [f"mysekai_fixture_{rid}.png", f"fixture_{rid}.png"]
+    else:
+        return None
+
+    for fname in candidates:
+        path = os.path.join(icon_dir, fname)
+        if os.path.isfile(path):
+            cache[key] = Image.open(path).convert("RGBA")
+            return cache[key]
+    return None
+
+
+def _get_icon(icon_dir, cache, key):
+    icon = cache.get(key)
+    if icon is not None:
+        return icon
+    return _try_load_dynamic_icon(icon_dir, cache, key)
+
+
 def _extract_points(mysekai_json):
     points_by_site = {}
     maps = mysekai_json.get("updatedResources", {}).get("userMysekaiHarvestMaps", [])
@@ -222,6 +247,8 @@ def _extract_points(mysekai_json):
                 "mysekai_material",
                 "mysekai_item",
                 "mysekai_music_record",
+                "material",
+                "mysekai_fixture",
             ):
                 continue
             x = drop.get("positionX")
@@ -262,10 +289,15 @@ def _filter_same_coord_base_materials(stat):
     return stat
 
 
-def _filter_unmapped_record_entries(entries, icons):
+def _filter_unmapped_special_entries(entries, icons, icon_dir):
     filtered = []
     for key, qty in entries:
-        if icons.get(key) is None and key[0] == "mysekai_music_record":
+        icon = _get_icon(icon_dir, icons, key)
+        if icon is None and key[0] in (
+            "mysekai_music_record",
+            "material",
+            "mysekai_fixture",
+        ):
             continue
         filtered.append((key, qty))
     return filtered
@@ -344,14 +376,14 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
         # Keep icon layout deterministic for the same coordinate:
         # sort by resource identity instead of current quantity.
         entries = sorted(stat.items(), key=lambda t: (t[0][0], t[0][1]))
-        entries = _filter_unmapped_record_entries(entries, icons)
+        entries = _filter_unmapped_special_entries(entries, icons, icon_dir)
 
         if not entries:
             continue
 
         if len(entries) == 1:
             main_key, main_qty = entries[0]
-            icon = icons.get(main_key)
+            icon = _get_icon(icon_dir, icons, main_key)
             if icon is not None:
                 icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
                 img.paste(
@@ -374,7 +406,7 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
                 angle = (2 * math.pi * i / len(entries)) - math.pi / 2
                 ix = int(px + math.cos(angle) * spread)
                 iy = int(py + math.sin(angle) * spread)
-                icon = icons.get(key)
+                icon = _get_icon(icon_dir, icons, key)
                 if icon is not None:
                     icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
                     img.paste(

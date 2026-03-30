@@ -111,6 +111,11 @@ docker run -d \
 - `MYSEKAI_COUNT_FONT_SIZE`：数量文字尺寸
 - `MYSEKAI_ICON_SPREAD`：同点多资源图标扩散半径
 - `MYSEKAI_IGNORE_BASE_MATERIALS=1`：同点位存在高阶材料时隐藏普通材料
+- 图标覆盖补充：
+  - `material` 使用独立图标组，不再按 `mysekai_material` 解释
+  - 未映射的 `mysekai_music_record`、未映射的 `material`、未映射的 `mysekai_fixture` 会直接跳过，不再画占位点
+  - 额外图标可放到 `04_artifacts/docker_receiver_3939_dev/dockerScripts/mysekai_assets/icon/`
+  - 直接识别的文件名：`material_<id>.png`、`mysekai_fixture_<id>.png`、`fixture_<id>.png`
 
 站点级校准参数：
 - `SITE<id>_WORLD_HALF_X` / `SITE<id>_WORLD_HALF_Z`：站点固定世界半宽/半高，用于把世界坐标稳定投影到底图，减少跨包漂移
