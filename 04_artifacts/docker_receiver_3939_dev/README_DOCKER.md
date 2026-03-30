@@ -137,3 +137,4 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'python /app/dockerScripts/render_
 ## Icon File Naming
 - mysekai_material and mysekai_item support direct override files named after iconAssetbundleName, such as item_plant_4.png.
 - mysekai_fixture uses canonical local filenames such as mysekai_fixture_<id>.png or fixture_<id>.png.
+- visual hierarchy: common materials render as large icons; rare drops (world fragments, blueprint scraps, fixture/seed/sapling, and other special drops) render as smaller semi-transparent icons. Diamonds only fall back to the small tier when they share the same coordinate with stone/mineral drops.

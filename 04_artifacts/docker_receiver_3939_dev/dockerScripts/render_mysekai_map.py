@@ -32,6 +32,42 @@ TYPE_FALLBACK_ICON_FILES = {
     "mysekai_music_record": "Extra_Record.png",
 }
 
+COMMON_LARGE_ASSET_KEYS = {
+    "item_wood_1",
+    "item_wood_2",
+    "item_wood_3",
+    "item_mineral_1",
+    "item_mineral_2",
+    "item_mineral_3",
+    "item_mineral_4",
+    "item_mineral_5",
+    "item_mineral_6",
+    "item_junk_1",
+    "item_junk_2",
+    "item_junk_3",
+    "item_junk_4",
+    "item_junk_5",
+    "item_junk_6",
+    "item_junk_7",
+    "item_junk_8",
+    "item_junk_9",
+    "item_junk_10",
+    "item_plant_1",
+    "item_plant_2",
+    "item_plant_3",
+    "item_plant_4",
+    "item_tone_8",
+}
+
+STONE_ASSET_KEYS = {
+    "item_mineral_1",
+    "item_mineral_2",
+    "item_mineral_3",
+    "item_mineral_4",
+    "item_mineral_5",
+    "item_mineral_6",
+}
+
 _RESOURCE_ICON_MAP_CACHE = None
 _RESOURCE_ASSET_KEY_CACHE = None
 _ICON_CACHE_BY_DIR = {}
@@ -384,6 +420,48 @@ def _filter_unmapped_special_entries(entries, icons, icon_dir):
     return filtered
 
 
+def _point_contains_stone_material(entries):
+    asset_keys = _load_resource_asset_keys()
+    for key, _qty in entries:
+        if key[0] != "mysekai_material":
+            continue
+        if asset_keys.get(key) in STONE_ASSET_KEYS:
+            return True
+    return False
+
+
+def _get_visual_style(key, point_entries):
+    rtype, rid = key
+    asset_keys = _load_resource_asset_keys()
+
+    if rtype in {"mysekai_item", "material", "mysekai_fixture", "mysekai_music_record"}:
+        return "small"
+
+    if rtype != "mysekai_material":
+        return "large"
+
+    asset_key = asset_keys.get(key, "")
+
+    # Diamond is large by default, but falls back to the small tier when
+    # it appears on the same coordinate as common stone/mineral drops.
+    if rid == 12:
+        return "small" if _point_contains_stone_material(point_entries) else "large"
+
+    return "large" if asset_key in COMMON_LARGE_ASSET_KEYS else "small"
+
+
+def _style_metrics(base_icon_size, base_font_size, style):
+    if style == "small":
+        icon_px = max(16, int(round(base_icon_size * 0.62)))
+        font_px = max(10, int(round(base_font_size * 0.72)))
+        alpha = 184
+    else:
+        icon_px = base_icon_size
+        font_px = base_font_size
+        alpha = 255
+    return icon_px, font_px, alpha
+
+
 def _resize_to_target_width(img, target_width):
     w, h = img.size
     out_w = max(1, int(target_width))
@@ -462,11 +540,17 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
 
         if len(entries) == 1:
             main_key, main_qty = entries[0]
+            style = _get_visual_style(main_key, entries)
+            icon_px, font_px, icon_alpha = _style_metrics(icon_size, font_size, style)
+            font_count = _get_font(font_px)
             icon = _get_icon(icon_dir, icons, main_key)
             if icon is not None:
-                icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
+                icon_img = icon.resize((icon_px, icon_px), Image.LANCZOS)
+                if icon_alpha < 255:
+                    icon_img = icon_img.copy()
+                    icon_img.putalpha(icon_img.getchannel("A").point(lambda a: (a * icon_alpha) // 255))
                 img.paste(
-                    icon_img, (px - icon_size // 2, py - icon_size // 2), icon_img
+                    icon_img, (px - icon_px // 2, py - icon_px // 2), icon_img
                 )
             else:
                 draw.ellipse(
@@ -475,8 +559,8 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
                     outline=(220, 220, 220, 180),
                 )
             text = str(main_qty)
-            tx = px + (icon_size // 2) - 2
-            ty = py + (icon_size // 6)
+            tx = px + (icon_px // 2) - 2
+            ty = py + max(2, icon_px // 6)
             for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                 draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
             draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
@@ -485,11 +569,17 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
                 angle = (2 * math.pi * i / len(entries)) - math.pi / 2
                 ix = int(px + math.cos(angle) * spread)
                 iy = int(py + math.sin(angle) * spread)
+                style = _get_visual_style(key, entries)
+                icon_px, font_px, icon_alpha = _style_metrics(icon_size, font_size, style)
+                font_count = _get_font(font_px)
                 icon = _get_icon(icon_dir, icons, key)
                 if icon is not None:
-                    icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
+                    icon_img = icon.resize((icon_px, icon_px), Image.LANCZOS)
+                    if icon_alpha < 255:
+                        icon_img = icon_img.copy()
+                        icon_img.putalpha(icon_img.getchannel("A").point(lambda a: (a * icon_alpha) // 255))
                     img.paste(
-                        icon_img, (ix - icon_size // 2, iy - icon_size // 2), icon_img
+                        icon_img, (ix - icon_px // 2, iy - icon_px // 2), icon_img
                     )
                 else:
                     draw.ellipse(
@@ -498,8 +588,8 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
                         outline=(220, 220, 220, 180),
                     )
                 text = str(qty)
-                tx = ix + (icon_size // 2) - 2
-                ty = iy + (icon_size // 6)
+                tx = ix + (icon_px // 2) - 2
+                ty = iy + max(2, icon_px // 6)
                 for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                     draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
                 draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)

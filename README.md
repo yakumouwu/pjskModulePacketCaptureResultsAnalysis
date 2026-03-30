@@ -231,3 +231,4 @@ Validated behavior (current):
 ## Icon Overrides
 - mysekai_material and mysekai_item now prefer local override files named after iconAssetbundleName, for example item_plant_4.png, before falling back to the shared built-in icon mapping.
 - mysekai_fixture now uses canonical local filenames such as mysekai_fixture_<id>.png or fixture_<id>.png.
+- visual hierarchy: common materials render as large icons; rare drops (world fragments, blueprint scraps, fixture/seed/sapling, and other special drops) render as smaller semi-transparent icons. Diamonds only fall back to the small tier when they share the same coordinate with stone/mineral drops.
