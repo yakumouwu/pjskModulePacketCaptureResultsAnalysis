@@ -117,6 +117,12 @@ FALLBACK_ICON_MAP = {
     ("mysekai_item", 7): "Blueprint_Scrap.png",
 }
 
+# Same-coordinate icon priority for rendering.
+# Earlier entries have higher priority.
+DEFAULT_SAME_COORD_PRIORITY = [
+    ("mysekai_material", 12),
+]
+
 
 def _env_float(name, default):
     v = os.environ.get(name)
@@ -143,6 +149,39 @@ def _env_bool(name, default):
     if v is None or v == "":
         return bool(default)
     return str(v).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _parse_same_coord_priority():
+    """
+    Parse env MYSEKAI_SAME_COORD_PRIORITY:
+    Example: "mysekai_material:12,mysekai_item:7,mysekai_material:10"
+    """
+    text = os.environ.get("MYSEKAI_SAME_COORD_PRIORITY", "").strip()
+    if not text:
+        return list(DEFAULT_SAME_COORD_PRIORITY)
+
+    parsed = []
+    for part in text.split(","):
+        item = part.strip()
+        if not item or ":" not in item:
+            continue
+        rtype, rid_text = item.split(":", 1)
+        rtype = rtype.strip()
+        rid_text = rid_text.strip()
+        if not rtype:
+            continue
+        try:
+            rid = int(rid_text)
+        except Exception:
+            continue
+        parsed.append((rtype, rid))
+
+    return parsed if parsed else list(DEFAULT_SAME_COORD_PRIORITY)
+
+
+def _same_coord_sort_key(key, priority_map):
+    # Unknown keys keep deterministic fallback ordering after prioritized keys.
+    return (priority_map.get(key, 10**9), key[0], key[1])
 
 
 def _get_font(size):
@@ -360,17 +399,6 @@ def _filter_same_coord_base_materials(stat):
     - if id=1 and any id in [2,5] coexist, hide id=1
     - if id=6 and any id in [7,12] coexist, hide id=6
     """
-    if not _env_bool("MYSEKAI_IGNORE_BASE_MATERIALS", True):
-        return stat
-
-    material_keys = {rid for (rtype, rid) in stat if rtype == "mysekai_material"}
-
-    if 1 in material_keys and any(rid in material_keys for rid in range(2, 6)):
-        stat.pop(("mysekai_material", 1), None)
-
-    if 6 in material_keys and any(rid in material_keys for rid in range(7, 13)):
-        stat.pop(("mysekai_material", 6), None)
-
     return stat
 
 
@@ -409,8 +437,11 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
     icons = _load_icons(icon_dir, resource_icon_map)
     icon_size = max(16, _env_int("MYSEKAI_ICON_SIZE", 36))
     font_size = max(10, _env_int("MYSEKAI_COUNT_FONT_SIZE", 18))
-    spread = max(8, _env_int("MYSEKAI_ICON_SPREAD", 22))
+    side_gap = max(0, _env_int("MYSEKAI_SIDE_COLUMN_GAP", 2))
+    column_vgap = max(0, _env_int("MYSEKAI_SIDE_COLUMN_VGAP", 2))
     font_count = _get_font(font_size)
+    same_coord_priority = _parse_same_coord_priority()
+    priority_map = {key: i for i, key in enumerate(same_coord_priority)}
 
     img = Image.open(bg_path).convert("RGBA")
     draw = ImageDraw.Draw(img)
@@ -444,6 +475,29 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
         pz = offset_z + (cz * scale_z)
         return int(px), int(pz)
 
+    def draw_one_icon(center_x, center_y, key, qty):
+        icon = _get_icon(icon_dir, icons, key)
+        if icon is not None:
+            icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
+            img.paste(
+                icon_img,
+                (center_x - icon_size // 2, center_y - icon_size // 2),
+                icon_img,
+            )
+        else:
+            draw.ellipse(
+                [center_x - 8, center_y - 8, center_x + 8, center_y + 8],
+                fill=(120, 120, 120, 90),
+                outline=(220, 220, 220, 180),
+            )
+
+        text = str(qty)
+        tx = center_x + (icon_size // 2) - 2
+        ty = center_y + max(2, icon_size // 6)
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
+        draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
+
     for (cx, cz), drops in coords.items():
         px, py = coord_to_px(cx, cz)
 
@@ -452,9 +506,10 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
             key = (d["resourceType"], d["resourceId"])
             stat[key] = stat.get(key, 0) + int(d["qty"])
         stat = _filter_same_coord_base_materials(stat)
-        # Keep icon layout deterministic for the same coordinate:
-        # sort by resource identity instead of current quantity.
-        entries = sorted(stat.items(), key=lambda t: (t[0][0], t[0][1]))
+        # Keep deterministic order with configurable priority first.
+        entries = sorted(
+            stat.items(), key=lambda t: _same_coord_sort_key(t[0], priority_map)
+        )
         entries = _filter_unmapped_special_entries(entries, icons, icon_dir)
 
         if not entries:
@@ -462,47 +517,55 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
 
         if len(entries) == 1:
             main_key, main_qty = entries[0]
-            icon = _get_icon(icon_dir, icons, main_key)
-            if icon is not None:
-                icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
-                img.paste(
-                    icon_img, (px - icon_size // 2, py - icon_size // 2), icon_img
-                )
-            else:
-                draw.ellipse(
-                    [px - 8, py - 8, px + 8, py + 8],
-                    fill=(120, 120, 120, 90),
-                    outline=(220, 220, 220, 180),
-                )
-            text = str(main_qty)
-            tx = px + (icon_size // 2) - 2
-            ty = py + max(2, icon_size // 6)
-            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
-            draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
+            draw_one_icon(px, py, main_key, main_qty)
         else:
-            for i, (key, qty) in enumerate(entries):
-                angle = (2 * math.pi * i / len(entries)) - math.pi / 2
-                ix = int(px + math.cos(angle) * spread)
-                iy = int(py + math.sin(angle) * spread)
+            # First priority icon stays centered.
+            main_key, main_qty = entries[0]
+            draw_one_icon(px, py, main_key, main_qty)
+
+            # Remaining icons are stacked as one right-side vertical column.
+            # Ratio rule from design:
+            # - 1 icon on the right: 1/2 size
+            # - 2 icons on the right: each 1/2 size
+            # - 3 icons on the right: each 1/3 size
+            rest = entries[1:]
+            rest_count = len(rest)
+            if rest_count <= 2:
+                right_icon_size = max(10, int(round(icon_size / 2.0)))
+            else:
+                right_icon_size = max(8, int(round(icon_size / float(rest_count))))
+
+            right_font_size = max(
+                9, int(round(font_size * (right_icon_size / float(icon_size))))
+            )
+            right_font = _get_font(right_font_size)
+            right_x = px + (icon_size // 2) + side_gap + (right_icon_size // 2)
+            start_y = py - (icon_size // 2) + (right_icon_size // 2)
+            step_y = right_icon_size + column_vgap
+
+            for idx, (key, qty) in enumerate(rest):
+                iy = start_y + (idx * step_y)
                 icon = _get_icon(icon_dir, icons, key)
                 if icon is not None:
-                    icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
+                    icon_img = icon.resize((right_icon_size, right_icon_size), Image.LANCZOS)
                     img.paste(
-                        icon_img, (ix - icon_size // 2, iy - icon_size // 2), icon_img
+                        icon_img,
+                        (right_x - right_icon_size // 2, iy - right_icon_size // 2),
+                        icon_img,
                     )
                 else:
                     draw.ellipse(
-                        [ix - 6, iy - 6, ix + 6, iy + 6],
+                        [right_x - 6, iy - 6, right_x + 6, iy + 6],
                         fill=(120, 120, 120, 90),
                         outline=(220, 220, 220, 180),
                     )
+
                 text = str(qty)
-                tx = ix + (icon_size // 2) - 2
-                ty = iy + max(2, icon_size // 6)
+                tx = right_x + (right_icon_size // 2) - 2
+                ty = iy + max(1, right_icon_size // 8)
                 for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                    draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
-                draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
+                    draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=right_font)
+                draw.text((tx, ty), text, fill=(255, 255, 255), font=right_font)
 
     # Keep source map aspect ratio instead of forcing square output.
     panel = _resize_to_target_width(img, target_size)
