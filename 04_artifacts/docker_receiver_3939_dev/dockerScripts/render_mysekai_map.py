@@ -123,6 +123,20 @@ DEFAULT_SAME_COORD_PRIORITY = [
     ("mysekai_material", 12),
 ]
 
+CATEGORY_PRIORITY = {
+    "mysekai_material": 0,
+    "material": 1,
+    "mysekai_fixture": 2,
+    "mysekai_item": 3,
+    "mysekai_music_record": 4,
+}
+
+MYSEKAI_MATERIAL_PRIORITY_HEAD = {
+    21: 0,
+    22: 1,
+    6: 2,
+}
+
 
 def _env_float(name, default):
     v = os.environ.get(name)
@@ -180,8 +194,23 @@ def _parse_same_coord_priority():
 
 
 def _same_coord_sort_key(key, priority_map):
-    # Unknown keys keep deterministic fallback ordering after prioritized keys.
-    return (priority_map.get(key, 10**9), key[0], key[1])
+    # Explicit env/default pair priority has highest precedence.
+    explicit_rank = priority_map.get(key)
+    if explicit_rank is not None:
+        return (-1, explicit_rank, key[0], key[1])
+
+    rtype, rid = key
+    cat_rank = CATEGORY_PRIORITY.get(rtype, 10**6)
+
+    # Custom per-id order for mysekai_material:
+    # 21 > 22 > 6 > others(ascending by id)
+    if rtype == "mysekai_material":
+        mat_rank = MYSEKAI_MATERIAL_PRIORITY_HEAD.get(rid, 1000 + rid)
+        return (cat_rank, mat_rank, rtype, rid)
+
+    # For material / mysekai_fixture / mysekai_item:
+    # order by ascending id inside each category.
+    return (cat_rank, rid, rtype, rid)
 
 
 def _get_font(size):
@@ -436,7 +465,7 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
     resource_icon_map = _load_resource_icon_map()
     icons = _load_icons(icon_dir, resource_icon_map)
     icon_size = max(16, _env_int("MYSEKAI_ICON_SIZE", 36))
-    font_size = max(10, _env_int("MYSEKAI_COUNT_FONT_SIZE", 18))
+    font_size = max(10, _env_int("MYSEKAI_COUNT_FONT_SIZE", 16))
     side_gap = max(0, _env_int("MYSEKAI_SIDE_COLUMN_GAP", 2))
     column_vgap = max(0, _env_int("MYSEKAI_SIDE_COLUMN_VGAP", 2))
     font_count = _get_font(font_size)
@@ -492,11 +521,30 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
             )
 
         text = str(qty)
-        tx = center_x + (icon_size // 2) - 2
-        ty = center_y + max(2, icon_size // 6)
+        tx = center_x - (icon_size // 2) + 2
+        ty = center_y - (icon_size // 2) - 2
         for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
         draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
+
+    def draw_small_icon(center_x, center_y, key, small_size):
+        icon = _get_icon(icon_dir, icons, key)
+        if icon is not None:
+            icon_img = icon.resize((small_size, small_size), Image.LANCZOS)
+            img.paste(
+                icon_img,
+                (center_x - small_size // 2, center_y - small_size // 2),
+                icon_img,
+            )
+        else:
+            draw.ellipse(
+                [center_x - 6, center_y - 6, center_x + 6, center_y + 6],
+                fill=(120, 120, 120, 90),
+                outline=(220, 220, 220, 180),
+            )
+
+    main_layer_ops = []
+    small_layer_ops = []
 
     for (cx, cz), drops in coords.items():
         px, py = coord_to_px(cx, cz)
@@ -517,11 +565,11 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
 
         if len(entries) == 1:
             main_key, main_qty = entries[0]
-            draw_one_icon(px, py, main_key, main_qty)
+            main_layer_ops.append((px, py, main_key, main_qty))
         else:
             # First priority icon stays centered.
             main_key, main_qty = entries[0]
-            draw_one_icon(px, py, main_key, main_qty)
+            main_layer_ops.append((px, py, main_key, main_qty))
 
             # Remaining icons are stacked as one right-side vertical column.
             # Ratio rule from design:
@@ -535,37 +583,21 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
             else:
                 right_icon_size = max(8, int(round(icon_size / float(rest_count))))
 
-            right_font_size = max(
-                9, int(round(font_size * (right_icon_size / float(icon_size))))
-            )
-            right_font = _get_font(right_font_size)
             right_x = px + (icon_size // 2) + side_gap + (right_icon_size // 2)
             start_y = py - (icon_size // 2) + (right_icon_size // 2)
             step_y = right_icon_size + column_vgap
 
             for idx, (key, qty) in enumerate(rest):
                 iy = start_y + (idx * step_y)
-                icon = _get_icon(icon_dir, icons, key)
-                if icon is not None:
-                    icon_img = icon.resize((right_icon_size, right_icon_size), Image.LANCZOS)
-                    img.paste(
-                        icon_img,
-                        (right_x - right_icon_size // 2, iy - right_icon_size // 2),
-                        icon_img,
-                    )
-                else:
-                    draw.ellipse(
-                        [right_x - 6, iy - 6, right_x + 6, iy + 6],
-                        fill=(120, 120, 120, 90),
-                        outline=(220, 220, 220, 180),
-                    )
+                # Small/right-side icons keep merged logic but hide count text.
+                small_layer_ops.append((right_x, iy, key, right_icon_size))
 
-                text = str(qty)
-                tx = right_x + (right_icon_size // 2) - 2
-                ty = iy + max(1, right_icon_size // 8)
-                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                    draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=right_font)
-                draw.text((tx, ty), text, fill=(255, 255, 255), font=right_font)
+    # Layered rendering: draw all main icons first, then all small icons.
+    # This guarantees small icons are not covered by later-drawn main icons.
+    for px, py, key, qty in main_layer_ops:
+        draw_one_icon(px, py, key, qty)
+    for sx, sy, key, small_size in small_layer_ops:
+        draw_small_icon(sx, sy, key, small_size)
 
     # Keep source map aspect ratio instead of forcing square output.
     panel = _resize_to_target_width(img, target_size)
