@@ -165,6 +165,43 @@ def _env_bool(name, default):
     return str(v).strip().lower() in ("1", "true", "yes", "on")
 
 
+def _neutralize_cyan_edge(img):
+    """
+    Reduce cyan halo on semi-transparent edge pixels by pulling RGB towards gray.
+    """
+    if not _env_bool("MYSEKAI_EDGE_NEUTRALIZE", True):
+        return img
+    edge_alpha_max = _env_int("MYSEKAI_EDGE_ALPHA_MAX", 245)
+    edge_alpha_max = max(1, min(254, edge_alpha_max))
+    rb_diff = _env_int("MYSEKAI_EDGE_CYAN_DIFF", 8)
+    strength = _env_float("MYSEKAI_EDGE_NEUTRALIZE_STRENGTH", 0.75)
+    strength = max(0.0, min(1.0, strength))
+
+    px = list(img.getdata())
+    changed = False
+    out = []
+    for r, g, b, a in px:
+        if 0 < a <= edge_alpha_max and g >= r + rb_diff and b >= r + rb_diff:
+            gray = int(round((r + g + b) / 3.0))
+            nr = int(round(r + (gray - r) * strength))
+            ng = int(round(g + (gray - g) * strength))
+            nb = int(round(b + (gray - b) * strength))
+            out.append((nr, ng, nb, a))
+            changed = True
+        else:
+            out.append((r, g, b, a))
+
+    if not changed:
+        return img
+    img2 = Image.new("RGBA", img.size)
+    img2.putdata(out)
+    return img2
+
+
+def _load_icon_rgba(path):
+    return _neutralize_cyan_edge(Image.open(path).convert("RGBA"))
+
+
 def _parse_same_coord_priority():
     """
     Parse env MYSEKAI_SAME_COORD_PRIORITY:
@@ -347,7 +384,7 @@ def _load_icons(icon_dir, resource_icon_map):
             continue
         path = os.path.join(icon_dir, fname)
         if os.path.isfile(path):
-            cache[key] = Image.open(path).convert("RGBA")
+            cache[key] = _load_icon_rgba(path)
     return cache
 
 
@@ -364,7 +401,7 @@ def _try_load_dynamic_icon(icon_dir, cache, key):
         fname = pattern.format(id=rid)
         path = os.path.join(icon_dir, fname)
         if os.path.isfile(path):
-            cache[key] = Image.open(path).convert("RGBA")
+            cache[key] = _load_icon_rgba(path)
             return cache[key]
     cache[key] = None
     return None
@@ -379,14 +416,14 @@ def _get_icon(icon_dir, cache, key):
     if asset_key:
         path = os.path.join(icon_dir, f"{asset_key}.png")
         if os.path.isfile(path):
-            cache[key] = Image.open(path).convert("RGBA")
+            cache[key] = _load_icon_rgba(path)
             return cache[key]
 
     fallback_file = TYPE_FALLBACK_ICON_FILES.get(key[0])
     if fallback_file:
         path = os.path.join(icon_dir, fallback_file)
         if os.path.isfile(path):
-            cache[key] = Image.open(path).convert("RGBA")
+            cache[key] = _load_icon_rgba(path)
             return cache[key]
 
     return _try_load_dynamic_icon(icon_dir, cache, key)
@@ -423,12 +460,22 @@ def _extract_points(mysekai_json):
 
 def _filter_same_coord_base_materials(stat):
     """
-    Hide base materials at the same coordinate when upgraded variants exist.
-    Rules (mysekai_material only):
-    - if id=1 and any id in [2,5] coexist, hide id=1
-    - if id=6 and any id in [7,12] coexist, hide id=6
+    Conditional hide rules for mysekai_material at the same coordinate:
+    - hide id=1 only when any of [2,3,4,5] coexist
+    - hide id=6 only when any of [7,8,9,10,11] coexist
     """
-    return stat
+    mat_ids = {rid for (rtype, rid) in stat.keys() if rtype == "mysekai_material"}
+    hide_1 = 1 in mat_ids and any(x in mat_ids for x in (2, 3, 4, 5))
+    hide_6 = 6 in mat_ids and any(x in mat_ids for x in (7, 8, 9, 10, 11))
+
+    filtered = {}
+    for (rtype, rid), qty in stat.items():
+        if rtype == "mysekai_material" and (
+            (rid == 1 and hide_1) or (rid == 6 and hide_6)
+        ):
+            continue
+        filtered[(rtype, rid)] = qty
+    return filtered
 
 
 def _filter_unmapped_special_entries(entries, icons, icon_dir):
