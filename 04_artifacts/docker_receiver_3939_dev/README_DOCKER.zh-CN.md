@@ -42,7 +42,6 @@ docker run -d \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
-  -e MYSEKAI_ICON_SPREAD=22 \
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
@@ -89,8 +88,13 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'python /app/dockerScripts/render_
   - `MYSEKAI_MAP_IMAGE_SIZE`：输出目标宽度
   - `MYSEKAI_ICON_SIZE`：图标尺寸
   - `MYSEKAI_COUNT_FONT_SIZE`：数量文字尺寸
-  - `MYSEKAI_ICON_SPREAD`：同点多资源图标扩散半径
-  - `MYSEKAI_IGNORE_BASE_MATERIALS`：是否忽略同点位普通材料
+  - 同点位普通材料条件忽略（内置）：
+    - 同点位出现 `id=2/3/4/5` 时隐藏 `mysekai_material id=1`
+    - 同点位出现 `id=7/8/9/10/11` 时隐藏 `mysekai_material id=6`
+  - 同点位重叠绘制规则：
+    - 主图标居中，数量角标在左上
+    - 其余图标右侧小列展示，不显示数量
+    - 小图标统一上层绘制，避免被大图标覆盖
   - `material` 使用独立图标组，不再按 `mysekai_material` 解释
   - `mysekai_music_record` 统一使用共享图标 `Extra_Record.png`
   - 未映射的 `material`、未映射的 `mysekai_fixture` 会直接跳过，不再画占位点

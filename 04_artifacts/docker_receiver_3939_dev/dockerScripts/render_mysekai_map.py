@@ -165,43 +165,6 @@ def _env_bool(name, default):
     return str(v).strip().lower() in ("1", "true", "yes", "on")
 
 
-def _neutralize_cyan_edge(img):
-    """
-    Reduce cyan halo on semi-transparent edge pixels by pulling RGB towards gray.
-    """
-    if not _env_bool("MYSEKAI_EDGE_NEUTRALIZE", True):
-        return img
-    edge_alpha_max = _env_int("MYSEKAI_EDGE_ALPHA_MAX", 245)
-    edge_alpha_max = max(1, min(254, edge_alpha_max))
-    rb_diff = _env_int("MYSEKAI_EDGE_CYAN_DIFF", 8)
-    strength = _env_float("MYSEKAI_EDGE_NEUTRALIZE_STRENGTH", 0.75)
-    strength = max(0.0, min(1.0, strength))
-
-    px = list(img.getdata())
-    changed = False
-    out = []
-    for r, g, b, a in px:
-        if 0 < a <= edge_alpha_max and g >= r + rb_diff and b >= r + rb_diff:
-            gray = int(round((r + g + b) / 3.0))
-            nr = int(round(r + (gray - r) * strength))
-            ng = int(round(g + (gray - g) * strength))
-            nb = int(round(b + (gray - b) * strength))
-            out.append((nr, ng, nb, a))
-            changed = True
-        else:
-            out.append((r, g, b, a))
-
-    if not changed:
-        return img
-    img2 = Image.new("RGBA", img.size)
-    img2.putdata(out)
-    return img2
-
-
-def _load_icon_rgba(path):
-    return _neutralize_cyan_edge(Image.open(path).convert("RGBA"))
-
-
 def _parse_same_coord_priority():
     """
     Parse env MYSEKAI_SAME_COORD_PRIORITY:
@@ -384,7 +347,7 @@ def _load_icons(icon_dir, resource_icon_map):
             continue
         path = os.path.join(icon_dir, fname)
         if os.path.isfile(path):
-            cache[key] = _load_icon_rgba(path)
+            cache[key] = Image.open(path).convert("RGBA")
     return cache
 
 
@@ -401,7 +364,7 @@ def _try_load_dynamic_icon(icon_dir, cache, key):
         fname = pattern.format(id=rid)
         path = os.path.join(icon_dir, fname)
         if os.path.isfile(path):
-            cache[key] = _load_icon_rgba(path)
+            cache[key] = Image.open(path).convert("RGBA")
             return cache[key]
     cache[key] = None
     return None
@@ -416,14 +379,14 @@ def _get_icon(icon_dir, cache, key):
     if asset_key:
         path = os.path.join(icon_dir, f"{asset_key}.png")
         if os.path.isfile(path):
-            cache[key] = _load_icon_rgba(path)
+            cache[key] = Image.open(path).convert("RGBA")
             return cache[key]
 
     fallback_file = TYPE_FALLBACK_ICON_FILES.get(key[0])
     if fallback_file:
         path = os.path.join(icon_dir, fallback_file)
         if os.path.isfile(path):
-            cache[key] = _load_icon_rgba(path)
+            cache[key] = Image.open(path).convert("RGBA")
             return cache[key]
 
     return _try_load_dynamic_icon(icon_dir, cache, key)

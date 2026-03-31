@@ -42,7 +42,6 @@ docker run -d \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
-  -e MYSEKAI_ICON_SPREAD=22 \
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
@@ -89,8 +88,13 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'python /app/dockerScripts/render_
   - `MYSEKAI_MAP_IMAGE_SIZE`: output width
   - `MYSEKAI_ICON_SIZE`: icon size
   - `MYSEKAI_COUNT_FONT_SIZE`: count text size
-  - `MYSEKAI_ICON_SPREAD`: spread radius for multi-resource points
-  - `MYSEKAI_IGNORE_BASE_MATERIALS`: whether to hide base materials on the same coordinate
+  - same-coordinate conditional hide is built-in:
+    - hide `mysekai_material id=1` only when `id=2/3/4/5` exists at the same coordinate
+    - hide `mysekai_material id=6` only when `id=7/8/9/10/11` exists at the same coordinate
+  - overlap draw order:
+    - main icon stays centered and count badge is shown at top-left
+    - remaining icons are stacked in one small right-side column
+    - small/right-side icons are drawn in an upper layer and do not show count text
   - `material` uses its own icon set and is no longer treated as `mysekai_material`
   - `mysekai_music_record` uses the shared `Extra_Record.png` icon
   - unmapped `material` and unmapped `mysekai_fixture` are skipped instead of drawing placeholder dots

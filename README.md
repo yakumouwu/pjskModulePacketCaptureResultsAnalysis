@@ -59,7 +59,6 @@ docker run -d \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
-  -e MYSEKAI_ICON_SPREAD=22 \
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
@@ -86,7 +85,9 @@ Data output:
 - plugin query render rule: with an available full mysekai packet, map rendering is allowed even without diamond hits
 - renderer projection rule: fixed-origin mode is used (map center = world `(0,0)`); lock `SITE<id>_WORLD_HALF_X/Z` for stable cross-packet alignment
 - single-site render output now preserves the source map aspect ratio (`16:9`), and `MYSEKAI_MAP_IMAGE_SIZE` is treated as target output width
-- same-coordinate base material ignore (enabled by default): `MYSEKAI_IGNORE_BASE_MATERIALS=1`
+- same-coordinate conditional hide is built-in:
+  - hide `mysekai_material id=1` only when `id=2/3/4/5` exists at the same coordinate
+  - hide `mysekai_material id=6` only when `id=7/8/9/10/11` exists at the same coordinate
 
 ## Key Runtime Settings
 
@@ -111,8 +112,10 @@ Render sizing:
 - `MYSEKAI_MAP_IMAGE_SIZE`: target output width for single-site render
 - `MYSEKAI_ICON_SIZE`: icon size
 - `MYSEKAI_COUNT_FONT_SIZE`: count text size
-- `MYSEKAI_ICON_SPREAD`: spread radius for multiple resources on the same coordinate
-- `MYSEKAI_IGNORE_BASE_MATERIALS=1`: hide base materials when upgraded variants exist on the same coordinate
+- overlap render rule:
+  - main icon stays centered and count badge is shown at top-left
+  - remaining icons are stacked in one small right-side column
+  - small/right-side icons are drawn in an upper layer and do not show count text
 - icon coverage:
   - `material` uses its own icon set and is no longer treated as `mysekai_material`
   - `mysekai_music_record` uses the shared `Extra_Record.png` icon
