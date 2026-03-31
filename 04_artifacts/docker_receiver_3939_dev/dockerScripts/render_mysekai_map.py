@@ -4,37 +4,70 @@ import math
 import os
 from collections import OrderedDict
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
+
+SUPPORTED_RESOURCE_TYPES = {
+    "mysekai_material",
+    "mysekai_item",
+    "mysekai_music_record",
+    "material",
+    "mysekai_fixture",
+}
+
+SKIP_UNMAPPED_RESOURCE_TYPES = {
+    "mysekai_music_record",
+    "material",
+    "mysekai_fixture",
+}
+
+DYNAMIC_ICON_PATTERNS = {
+    "material": ["material_{id}.png"],
+    "mysekai_fixture": [
+        "mysekai_fixture_{id}.png",
+        "fixture_{id}.png",
+    ],
+}
+
+TYPE_FALLBACK_ICON_FILES = {
+    "mysekai_music_record": "Extra_Record.png",
+}
+
+_RESOURCE_ICON_MAP_CACHE = None
+_RESOURCE_ASSET_KEY_CACHE = None
+_ICON_CACHE_BY_DIR = {}
 
 SITE_CONFIG = {
     5: {
         "name": "Map 1",
         "bg": "grassland.png",
         "transform": "zx_neg",
-        "scale_add": (8.5, 8.5),
-        "offset_add": (30.0, 0.0),
+        "world_bounds": (-30.0, 29.0, -23.0, 75.0),
+        "scale_add": (25.5, 25.5),
+        "offset_add": (0.0, -90.0),
     },
-    # Beach map: lift all overlays by ~12.5% of 1080p background height (~135px).
     6: {
         "name": "Map 2",
         "bg": "beach.png",
         "transform": "x_negz",
-        "scale_add": (4.6, 4.2),
-        "offset_add": (-70.0, -50.0),
+        "world_bounds": (-30.0, 29.0, -20.0, 68.0),
+        "scale_add": (16.6, 16.2),
+        "offset_add": (20.0, 120.0),
     },
     7: {
         "name": "Map 3",
         "bg": "flowergarden.png",
         "transform": "zx_neg",
-        "scale_add": (5.0, 3.0),
-        "offset_add": (55.0, -70.0),
+        "world_bounds": (-30.0, 29.0, -28.0, 75.0),
+        "scale_add": (19.0, 19.0),
+        "offset_add": (-60.0, 20.0),
     },
     8: {
         "name": "Map 4",
         "bg": "memorialplace.png",
         "transform": "x_negz",
-        "scale_add": (3.0, 0.0),
-        "offset_add": (-185.0, 35.0),
+        "world_bounds": (-30.0, 29.0, -29.0, 70.0),
+        "scale_add": (16.6, 16.2),
+        "offset_add": (20.0, -120.0),
     },
 }
 
@@ -82,7 +115,26 @@ ASSET_ICON_TO_FILE = {
 FALLBACK_ICON_MAP = {
     ("mysekai_material", 12): "Diamond.png",
     ("mysekai_item", 7): "Blueprint_Scrap.png",
-    ("mysekai_music_record", 79): "Extra_Record.png",
+}
+
+# Same-coordinate icon priority for rendering.
+# Earlier entries have higher priority.
+DEFAULT_SAME_COORD_PRIORITY = [
+    ("mysekai_material", 12),
+]
+
+CATEGORY_PRIORITY = {
+    "mysekai_material": 0,
+    "material": 1,
+    "mysekai_fixture": 2,
+    "mysekai_item": 3,
+    "mysekai_music_record": 4,
+}
+
+MYSEKAI_MATERIAL_PRIORITY_HEAD = {
+    21: 0,
+    22: 1,
+    6: 2,
 }
 
 
@@ -106,6 +158,61 @@ def _env_int(name, default):
         return int(default)
 
 
+def _env_bool(name, default):
+    v = os.environ.get(name)
+    if v is None or v == "":
+        return bool(default)
+    return str(v).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _parse_same_coord_priority():
+    """
+    Parse env MYSEKAI_SAME_COORD_PRIORITY:
+    Example: "mysekai_material:12,mysekai_item:7,mysekai_material:10"
+    """
+    text = os.environ.get("MYSEKAI_SAME_COORD_PRIORITY", "").strip()
+    if not text:
+        return list(DEFAULT_SAME_COORD_PRIORITY)
+
+    parsed = []
+    for part in text.split(","):
+        item = part.strip()
+        if not item or ":" not in item:
+            continue
+        rtype, rid_text = item.split(":", 1)
+        rtype = rtype.strip()
+        rid_text = rid_text.strip()
+        if not rtype:
+            continue
+        try:
+            rid = int(rid_text)
+        except Exception:
+            continue
+        parsed.append((rtype, rid))
+
+    return parsed if parsed else list(DEFAULT_SAME_COORD_PRIORITY)
+
+
+def _same_coord_sort_key(key, priority_map):
+    # Explicit env/default pair priority has highest precedence.
+    explicit_rank = priority_map.get(key)
+    if explicit_rank is not None:
+        return (-1, explicit_rank, key[0], key[1])
+
+    rtype, rid = key
+    cat_rank = CATEGORY_PRIORITY.get(rtype, 10**6)
+
+    # Custom per-id order for mysekai_material:
+    # 21 > 22 > 6 > others(ascending by id)
+    if rtype == "mysekai_material":
+        mat_rank = MYSEKAI_MATERIAL_PRIORITY_HEAD.get(rid, 1000 + rid)
+        return (cat_rank, mat_rank, rtype, rid)
+
+    # For material / mysekai_fixture / mysekai_item:
+    # order by ascending id inside each category.
+    return (cat_rank, rid, rtype, rid)
+
+
 def _get_font(size):
     font_paths = [
         os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "msyh.ttc"),
@@ -117,6 +224,17 @@ def _get_font(size):
         if os.path.isfile(p):
             return ImageFont.truetype(p, size)
     return ImageFont.load_default()
+
+
+def _enhance_icon_clarity(icon_img):
+    if not _env_bool("MYSEKAI_ICON_ENHANCE", True):
+        return icon_img
+    radius = max(0.1, _env_float("MYSEKAI_ICON_SHARP_RADIUS", 0.8))
+    percent = max(10, _env_int("MYSEKAI_ICON_SHARP_PERCENT", 130))
+    threshold = max(0, _env_int("MYSEKAI_ICON_SHARP_THRESHOLD", 2))
+    return icon_img.filter(
+        ImageFilter.UnsharpMask(radius=radius, percent=percent, threshold=threshold)
+    )
 
 
 def _transform(site_id, x, z):
@@ -146,16 +264,22 @@ def _find_map_json():
 
 
 def _load_resource_icon_map():
+    global _RESOURCE_ICON_MAP_CACHE
+    if _RESOURCE_ICON_MAP_CACHE is not None:
+        return dict(_RESOURCE_ICON_MAP_CACHE)
+
     mapping = dict(FALLBACK_ICON_MAP)
     map_json = _find_map_json()
     if not map_json:
-        return mapping
+        _RESOURCE_ICON_MAP_CACHE = dict(mapping)
+        return dict(_RESOURCE_ICON_MAP_CACHE)
 
     try:
         with open(map_json, "r", encoding="utf-8") as f:
             cfg = json.load(f)
     except Exception:
-        return mapping
+        _RESOURCE_ICON_MAP_CACHE = dict(mapping)
+        return dict(_RESOURCE_ICON_MAP_CACHE)
 
     for k, meta in cfg.get("material_meta", {}).items():
         try:
@@ -187,16 +311,96 @@ def _load_resource_icon_map():
         if icon_file:
             mapping[("mysekai_music_record", rid)] = icon_file
 
-    return mapping
+    _RESOURCE_ICON_MAP_CACHE = dict(mapping)
+    return dict(_RESOURCE_ICON_MAP_CACHE)
+
+
+def _load_resource_asset_keys():
+    global _RESOURCE_ASSET_KEY_CACHE
+    if _RESOURCE_ASSET_KEY_CACHE is not None:
+        return dict(_RESOURCE_ASSET_KEY_CACHE)
+
+    asset_keys = {}
+    map_json = _find_map_json()
+    if not map_json:
+        _RESOURCE_ASSET_KEY_CACHE = dict(asset_keys)
+        return dict(_RESOURCE_ASSET_KEY_CACHE)
+
+    try:
+        with open(map_json, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    except Exception:
+        _RESOURCE_ASSET_KEY_CACHE = dict(asset_keys)
+        return dict(_RESOURCE_ASSET_KEY_CACHE)
+
+    for rtype, section in (
+        ("mysekai_material", "material_meta"),
+        ("mysekai_item", "item_meta"),
+        ("mysekai_music_record", "music_record_meta"),
+    ):
+        for k, meta in cfg.get(section, {}).items():
+            try:
+                rid = int(k)
+            except Exception:
+                continue
+            asset_key = str(meta.get("icon", "")).strip()
+            if asset_key:
+                asset_keys[(rtype, rid)] = asset_key
+
+    _RESOURCE_ASSET_KEY_CACHE = dict(asset_keys)
+    return dict(_RESOURCE_ASSET_KEY_CACHE)
 
 
 def _load_icons(icon_dir, resource_icon_map):
-    cache = {}
+    cache = _ICON_CACHE_BY_DIR.setdefault(icon_dir, {})
     for key, fname in resource_icon_map.items():
+        if key in cache:
+            continue
         path = os.path.join(icon_dir, fname)
         if os.path.isfile(path):
             cache[key] = Image.open(path).convert("RGBA")
     return cache
+
+
+def _try_load_dynamic_icon(icon_dir, cache, key):
+    if key in cache:
+        return cache[key]
+
+    rtype, rid = key
+    candidates = DYNAMIC_ICON_PATTERNS.get(rtype)
+    if not candidates:
+        return None
+
+    for pattern in candidates:
+        fname = pattern.format(id=rid)
+        path = os.path.join(icon_dir, fname)
+        if os.path.isfile(path):
+            cache[key] = Image.open(path).convert("RGBA")
+            return cache[key]
+    cache[key] = None
+    return None
+
+
+def _get_icon(icon_dir, cache, key):
+    icon = cache.get(key)
+    if key in cache:
+        return icon
+
+    asset_key = _load_resource_asset_keys().get(key)
+    if asset_key:
+        path = os.path.join(icon_dir, f"{asset_key}.png")
+        if os.path.isfile(path):
+            cache[key] = Image.open(path).convert("RGBA")
+            return cache[key]
+
+    fallback_file = TYPE_FALLBACK_ICON_FILES.get(key[0])
+    if fallback_file:
+        path = os.path.join(icon_dir, fallback_file)
+        if os.path.isfile(path):
+            cache[key] = Image.open(path).convert("RGBA")
+            return cache[key]
+
+    return _try_load_dynamic_icon(icon_dir, cache, key)
 
 
 def _extract_points(mysekai_json):
@@ -209,11 +413,7 @@ def _extract_points(mysekai_json):
         coords = points_by_site.setdefault(site_id, {})
         for drop in hm.get("userMysekaiSiteHarvestResourceDrops", []):
             resource_type = str(drop.get("resourceType", ""))
-            if resource_type not in (
-                "mysekai_material",
-                "mysekai_item",
-                "mysekai_music_record",
-            ):
+            if resource_type not in SUPPORTED_RESOURCE_TYPES:
                 continue
             x = drop.get("positionX")
             z = drop.get("positionZ")
@@ -230,6 +430,43 @@ def _extract_points(mysekai_json):
                 }
             )
     return points_by_site
+
+
+def _filter_same_coord_base_materials(stat):
+    """
+    Conditional hide rules for mysekai_material at the same coordinate:
+    - hide id=1 only when any of [2,3,4,5] coexist
+    - hide id=6 only when any of [7,8,9,10,11] coexist
+    """
+    mat_ids = {rid for (rtype, rid) in stat.keys() if rtype == "mysekai_material"}
+    hide_1 = 1 in mat_ids and any(x in mat_ids for x in (2, 3, 4, 5))
+    hide_6 = 6 in mat_ids and any(x in mat_ids for x in (7, 8, 9, 10, 11))
+
+    filtered = {}
+    for (rtype, rid), qty in stat.items():
+        if rtype == "mysekai_material" and (
+            (rid == 1 and hide_1) or (rid == 6 and hide_6)
+        ):
+            continue
+        filtered[(rtype, rid)] = qty
+    return filtered
+
+
+def _filter_unmapped_special_entries(entries, icons, icon_dir):
+    filtered = []
+    for key, qty in entries:
+        icon = _get_icon(icon_dir, icons, key)
+        if icon is None and key[0] in SKIP_UNMAPPED_RESOURCE_TYPES:
+            continue
+        filtered.append((key, qty))
+    return filtered
+
+
+def _resize_to_target_width(img, target_width):
+    w, h = img.size
+    out_w = max(1, int(target_width))
+    out_h = max(1, int(round(out_w * (h / float(w)))))
+    return img.resize((out_w, out_h), Image.LANCZOS)
 
 
 def _render_site(points_by_site, site_id, assets_dir, target_size):
@@ -249,96 +486,144 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
     resource_icon_map = _load_resource_icon_map()
     icons = _load_icons(icon_dir, resource_icon_map)
     icon_size = max(16, _env_int("MYSEKAI_ICON_SIZE", 36))
-    font_size = max(10, _env_int("MYSEKAI_COUNT_FONT_SIZE", 18))
-    spread = max(8, _env_int("MYSEKAI_ICON_SPREAD", 22))
+    font_size = max(10, _env_int("MYSEKAI_COUNT_FONT_SIZE", 16))
+    side_gap = max(0, _env_int("MYSEKAI_SIDE_COLUMN_GAP", 2))
+    column_vgap = max(0, _env_int("MYSEKAI_SIDE_COLUMN_VGAP", 2))
     font_count = _get_font(font_size)
+    same_coord_priority = _parse_same_coord_priority()
+    priority_map = {key: i for i, key in enumerate(same_coord_priority)}
 
     img = Image.open(bg_path).convert("RGBA")
     draw = ImageDraw.Draw(img)
     bg_w, bg_h = img.size
 
-    all_x = [p[0] for p in coords]
-    all_z = [p[1] for p in coords]
-    min_x, max_x = min(all_x) - 1.0, max(all_x) + 1.0
-    min_z, max_z = min(all_z) - 1.0, max(all_z) + 1.0
-    range_x = max(1.0, max_x - min_x + 1.0)
-    range_z = max(1.0, max_z - min_z + 1.0)
-
+    min_x, max_x, min_z, max_z = cfg.get("world_bounds", (-30.0, 30.0, -30.0, 30.0))
+    half_world_x_default = max(abs(float(min_x)), abs(float(max_x)))
+    half_world_z_default = max(abs(float(min_z)), abs(float(max_z)))
+    half_world_x = max(
+        1.0, _env_float(f"SITE{site_id}_WORLD_HALF_X", half_world_x_default)
+    )
+    half_world_z = max(
+        1.0, _env_float(f"SITE{site_id}_WORLD_HALF_Z", half_world_z_default)
+    )
+    world_span_x = (half_world_x * 2.0) + 1.0
+    world_span_z = (half_world_z * 2.0) + 1.0
     usable_w = bg_w * 0.70
     usable_h = bg_h * 0.70
-    base_scale = min(usable_w / range_x, usable_h / range_z)
+    base_scale = min(usable_w / world_span_x, usable_h / world_span_z)
     scale_x = base_scale + cfg["scale_add"][0]
     scale_z = base_scale + cfg["scale_add"][1]
     scale_x += _env_float(f"SITE{site_id}_SCALE_X_DELTA", 0.0)
     scale_z += _env_float(f"SITE{site_id}_SCALE_Z_DELTA", 0.0)
-
-    offset_x = (bg_w - range_x * scale_x) / 2.0 + cfg["offset_add"][0]
-    offset_z = (bg_h - range_z * scale_z) / 2.0 + cfg["offset_add"][1]
+    offset_x = (bg_w / 2.0) + cfg["offset_add"][0]
+    offset_z = (bg_h / 2.0) + cfg["offset_add"][1]
     offset_x += _env_float(f"SITE{site_id}_OFFSET_X_DELTA", 0.0)
     offset_z += _env_float(f"SITE{site_id}_OFFSET_Z_DELTA", 0.0)
 
     def coord_to_px(cx, cz):
-        px = offset_x + (cx - min_x) * scale_x + scale_x / 2.0
-        pz = offset_z + (cz - min_z) * scale_z + scale_z / 2.0
+        px = offset_x + (cx * scale_x)
+        pz = offset_z + (cz * scale_z)
         return int(px), int(pz)
 
-    item_pixels = []
+    def draw_one_icon(center_x, center_y, key, qty):
+        icon = _get_icon(icon_dir, icons, key)
+        if icon is not None:
+            icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
+            icon_img = _enhance_icon_clarity(icon_img)
+            img.paste(
+                icon_img,
+                (center_x - icon_size // 2, center_y - icon_size // 2),
+                icon_img,
+            )
+        else:
+            draw.ellipse(
+                [center_x - 8, center_y - 8, center_x + 8, center_y + 8],
+                fill=(120, 120, 120, 90),
+                outline=(220, 220, 220, 180),
+            )
+
+        text = str(qty)
+        tx = center_x - (icon_size // 2) + 2
+        ty = center_y - (icon_size // 2) - 2
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
+        draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
+
+    def draw_small_icon(center_x, center_y, key, small_size):
+        icon = _get_icon(icon_dir, icons, key)
+        if icon is not None:
+            icon_img = icon.resize((small_size, small_size), Image.LANCZOS)
+            icon_img = _enhance_icon_clarity(icon_img)
+            img.paste(
+                icon_img,
+                (center_x - small_size // 2, center_y - small_size // 2),
+                icon_img,
+            )
+        else:
+            draw.ellipse(
+                [center_x - 6, center_y - 6, center_x + 6, center_y + 6],
+                fill=(120, 120, 120, 90),
+                outline=(220, 220, 220, 180),
+            )
+
+    main_layer_ops = []
+    small_layer_ops = []
+
     for (cx, cz), drops in coords.items():
         px, py = coord_to_px(cx, cz)
-        item_pixels.append((px, py))
 
         stat = {}
         for d in drops:
             key = (d["resourceType"], d["resourceId"])
             stat[key] = stat.get(key, 0) + int(d["qty"])
-        entries = sorted(stat.items(), key=lambda t: t[1], reverse=True)
+        stat = _filter_same_coord_base_materials(stat)
+        # Keep deterministic order with configurable priority first.
+        entries = sorted(
+            stat.items(), key=lambda t: _same_coord_sort_key(t[0], priority_map)
+        )
+        entries = _filter_unmapped_special_entries(entries, icons, icon_dir)
+
+        if not entries:
+            continue
 
         if len(entries) == 1:
             main_key, main_qty = entries[0]
-            icon = icons.get(main_key)
-            if icon is not None:
-                icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
-                img.paste(
-                    icon_img, (px - icon_size // 2, py - icon_size // 2), icon_img
-                )
-            else:
-                draw.ellipse(
-                    [px - 8, py - 8, px + 8, py + 8],
-                    fill=(120, 120, 120, 90),
-                    outline=(220, 220, 220, 180),
-                )
-            text = str(main_qty)
-            tx = px + (icon_size // 2) - 2
-            ty = py + (icon_size // 3)
-            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
-            draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
+            main_layer_ops.append((px, py, main_key, main_qty))
         else:
-            for i, (key, qty) in enumerate(entries):
-                angle = (2 * math.pi * i / len(entries)) - math.pi / 2
-                ix = int(px + math.cos(angle) * spread)
-                iy = int(py + math.sin(angle) * spread)
-                icon = icons.get(key)
-                if icon is not None:
-                    icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
-                    img.paste(
-                        icon_img, (ix - icon_size // 2, iy - icon_size // 2), icon_img
-                    )
-                else:
-                    draw.ellipse(
-                        [ix - 6, iy - 6, ix + 6, iy + 6],
-                        fill=(120, 120, 120, 90),
-                        outline=(220, 220, 220, 180),
-                    )
-                text = str(qty)
-                tx = ix + (icon_size // 2) - 2
-                ty = iy + (icon_size // 3)
-                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                    draw.text((tx + dx, ty + dy), text, fill=(0, 0, 0), font=font_count)
-                draw.text((tx, ty), text, fill=(255, 255, 255), font=font_count)
+            # First priority icon stays centered.
+            main_key, main_qty = entries[0]
+            main_layer_ops.append((px, py, main_key, main_qty))
 
-    # Keep full-map output so alerts always show complete site context.
-    panel = img.resize((int(target_size), int(target_size)), Image.LANCZOS)
+            # Remaining icons are stacked as one right-side vertical column.
+            # Ratio rule from design:
+            # - 1 icon on the right: 1/2 size
+            # - 2 icons on the right: each 1/2 size
+            # - 3 icons on the right: each 1/3 size
+            rest = entries[1:]
+            rest_count = len(rest)
+            if rest_count <= 2:
+                right_icon_size = max(10, int(round(icon_size / 2.0)))
+            else:
+                right_icon_size = max(8, int(round(icon_size / float(rest_count))))
+
+            right_x = px + (icon_size // 2) + side_gap + (right_icon_size // 2)
+            start_y = py - (icon_size // 2) + (right_icon_size // 2)
+            step_y = right_icon_size + column_vgap
+
+            for idx, (key, qty) in enumerate(rest):
+                iy = start_y + (idx * step_y)
+                # Small/right-side icons keep merged logic but hide count text.
+                small_layer_ops.append((right_x, iy, key, right_icon_size))
+
+    # Layered rendering: draw all main icons first, then all small icons.
+    # This guarantees small icons are not covered by later-drawn main icons.
+    for px, py, key, qty in main_layer_ops:
+        draw_one_icon(px, py, key, qty)
+    for sx, sy, key, small_size in small_layer_ops:
+        draw_small_icon(sx, sy, key, small_size)
+
+    # Keep source map aspect ratio instead of forcing square output.
+    panel = _resize_to_target_width(img, target_size)
     return panel, "ok"
 
 
@@ -373,7 +658,8 @@ def render_mysekai_map_image(json_path, out_path, assets_dir):
     if not rendered:
         return False, "no_site_image"
 
-    grid = Image.new("RGBA", (target * 2, target * 2 + 48), (18, 22, 30, 255))
+    panel_h = next(iter(rendered.values())).height
+    grid = Image.new("RGBA", (target * 2, panel_h * 2 + 48), (18, 22, 30, 255))
     title = ImageDraw.Draw(grid)
     title.text(
         (16, 10), "MySekai Resource Map", fill=(240, 240, 245), font=_get_font(20)
@@ -381,8 +667,8 @@ def render_mysekai_map_image(json_path, out_path, assets_dir):
     panel_pos = {
         5: (0, 48),
         7: (target, 48),
-        6: (0, target + 48),
-        8: (target, target + 48),
+        6: (0, panel_h + 48),
+        8: (target, panel_h + 48),
     }
     for sid, pos in panel_pos.items():
         if sid in rendered:

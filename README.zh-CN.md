@@ -59,18 +59,22 @@ docker run -d \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
-  -e MYSEKAI_ICON_SPREAD=22 \
+  -e MYSEKAI_ICON_ENHANCE=1 \
+  -e MYSEKAI_ICON_SHARP_RADIUS=0.8 \
+  -e MYSEKAI_ICON_SHARP_PERCENT=130 \
+  -e MYSEKAI_ICON_SHARP_THRESHOLD=2 \
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
+  -v /opt/docker_receiver_3939_dev/dockerScripts:/app/dockerScripts \
   pjsk-receiver:latest
 ```
 
-可选：
-- 将 `mysekai_resource_map.json` 放到配置目录，以提升图标映射准确性。
+补充说明：
+- 推荐把宿主机 `dockerScripts/` 挂载到容器 `/app/dockerScripts`，这样纯脚本更新通常只需要删旧容器并重建容器，无需重建镜像
 
 数据输出：
 - 原始包：`/data/raw_api/...`
@@ -81,6 +85,56 @@ docker run -d \
 - 事件日志：`/data/notifications/diamond_notifications.jsonl`
 - 自动通知去重与渲染规则：每用户每时间窗口仅首次钻石命中触发（`05:00-17:00`、`17:00-次日05:00`）
 - 插件查询渲染规则：只要存在可用全量 mysekai 包，即可渲染（不要求钻石命中）
+- 渲染投影规则：固定零点模式（地图中心 = 世界坐标 `(0,0)`），跨包一致性依赖固定世界尺度参数
+- 单图渲染默认保持底图原始比例（`16:9`），`MYSEKAI_MAP_IMAGE_SIZE` 表示输出目标宽度
+- 同点位普通材料条件忽略（内置规则）：
+  - 同点位出现 `id=2/3/4/5` 时隐藏 `mysekai_material id=1`
+  - 同点位出现 `id=7/8/9/10/11` 时隐藏 `mysekai_material id=6`
+
+## 关键运行参数
+
+推送与通知：
+- `BOT_PUSH_MODE`：当前代码回退值为 `group`，项目部署默认按群推送使用；如需私聊推送可显式设为 `private`
+- `BOT_MESSAGE_MODE`：支持 `text`、`image`、`text+image`；当前默认策略是 `text+image`，图片发送失败时会回退到纯文本
+- `BOT_PUSH_RETRY`：NapCat 推送重试次数
+- `NOTIFICATION_WINDOW_CACHE_HOURS`：窗口去重缓存保留时长
+- `NOTIFICATION_HIT_RETENTION`：命中归档 json 保留数量
+- `NOTIFICATION_EVENT_RETENTION_LINES`：`diamond_notifications.jsonl` 最大保留行数
+- 自动通知触发规则：只在检测到钻石命中（`mysekai_material`, `id=12`）时触发；同一用户在 `05:00-17:00` 或 `17:00-次日05:00` 窗口内仅首次命中会生成并推送图片，后续命中直接跳过
+
+插件查询：
+- `PLUGIN_API_KEY`：可选鉴权密钥，通过请求头 `X-API-Key` 校验
+- `PLUGIN_QUERY_IMAGE_RETENTION`：插件查询渲染图保留数量
+- 查询文本规则：
+  - 不带 `site_id` 的全量查询：返回空文本
+  - 带 `site_id` 的单图查询：仅返回中文地图名
+- 成功响应除 `text` 与 `images` 外，还会带 `source_json`，用于定位本次渲染实际使用的源数据文件
+
+渲染尺寸：
+- `MYSEKAI_MAP_IMAGE_SIZE`：单图渲染输出目标宽度
+- `MYSEKAI_ICON_SIZE`：图标尺寸
+- `MYSEKAI_COUNT_FONT_SIZE`：数量文字尺寸
+- 图标清晰度增强（默认开启）：
+  - `MYSEKAI_ICON_ENHANCE`（`1/0`）
+  - `MYSEKAI_ICON_SHARP_RADIUS`（默认 `0.8`）
+  - `MYSEKAI_ICON_SHARP_PERCENT`（默认 `130`）
+  - `MYSEKAI_ICON_SHARP_THRESHOLD`（默认 `2`）
+- 同点位重叠渲染规则：
+  - 主图标居中，数量角标在左上
+  - 其余图标右侧小列展示，不显示数量
+  - 小图标统一上层绘制，避免被大图标覆盖
+- 图标覆盖补充：
+  - `material` 使用独立图标组，不再按 `mysekai_material` 解释
+  - `mysekai_music_record` 统一使用共享图标 `Extra_Record.png`
+  - 未映射的 `material`、未映射的 `mysekai_fixture` 会直接跳过，不再画占位点
+  - 额外图标可放到 `04_artifacts/docker_receiver_3939_dev/dockerScripts/mysekai_assets/icon/`
+  - 直接识别的文件名：`material_<id>.png`、`mysekai_fixture_<id>.png`、`fixture_<id>.png`
+
+站点级校准参数：
+- `SITE<id>_WORLD_HALF_X` / `SITE<id>_WORLD_HALF_Z`：站点固定世界半宽/半高，用于把世界坐标稳定投影到底图，减少跨包漂移
+- `SITE<id>_SCALE_X_DELTA` / `SITE<id>_SCALE_Z_DELTA`：站点级横向/纵向缩放微调
+- `SITE<id>_OFFSET_X_DELTA` / `SITE<id>_OFFSET_Z_DELTA`：站点级横向/纵向偏移微调
+- 当前站点范围：`5,6,7,8`
 
 ## 虚拟钻石通知测试
 
@@ -123,25 +177,7 @@ PY
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-## 本地自动提交任务
-
-- 脚本：
-  - `auto_commit.bat`
-  - `auto_commit.ps1`
-- 日志：
-  - `logs/auto_commit.log`
-  - `logs/auto_commit_runner.log`
-- 网络抖动时脚本会自动重试 `git pull --rebase` 和 `git push`。
-
-当前覆盖范围：
-- API 路由识别（`extract_api_type`）
-- 钻石命中提取（`find_diamond_hits`，含混合数据场景）
-- 窗口与去重缓存逻辑（`get_refresh_window_id`、`filter_hits_for_current_window`、`cleanup_window_dedup_cache`）
-- 通知推送逻辑（`send_bot_message`、`push_text_with_optional_image`，含重试/回退/模式分支）
-- 通知流程轻集成（`process_mysekai_notification` 的跳过与命中分支）
-- HTTP 接口（`GET /healthz`、`GET /upload.js`、`GET /api/plugin/mysekai/map`、`GET /api/plugin/mysekai/file`、`GET /`）
-
-## LangBot 占位插件（上传自测）
+## LangBot 插件
 
 - 源码目录：`04_artifacts/langbot_plugin_placeholder/MysekaiQueryPlaceholder`
 - 上传包：`04_artifacts/langbot_plugin_placeholder/dist/MysekaiQueryPlaceholder-0.3.0.lbpkg`
@@ -152,18 +188,11 @@ python -m unittest discover -s tests -p "test_*.py" -v
   - `mysk whoami`
   - `mysk map`
   - `mysk map site <id>`
-- 非法 `mysk map` 参数会直接提示用法（不会静默回退到全图查询）
+- 非法 `mysk map` 参数会直接提示用法
 - 后端相关配置：
   - `backend_base_url`
   - `backend_map_api_path`
   - `backend_api_key`
-
-当前已验证行为：
-- `mysk bind <mysekai_user_id>`：按 QQ 号保存绑定（`QQ user_id -> mysekai_user_id`）
-- `mysk map`：查询已绑定用户的最新可用全量 mysekai 包并渲染
-- `mysk map site <id>`：按站点单图返回（`id` 取值 `5,6,7,8`）
-- 未绑定查询返回：`not bound, use: mysk bind <mysekai_user_id>`
-- 无数据查询返回：`map query failed: no full mysekai packet found for user`
 
 ## 端到端检查清单（Capture -> Decode -> NapCat Push）
 
@@ -177,6 +206,7 @@ python -m unittest discover -s tests -p "test_*.py" -v
 
 - 从 `04_artifacts/docker_receiver_3939_dev` 构建镜像
 - 运行时代码从 `dockerScripts/` 复制到 `/app/dockerScripts`
+- 如果宿主机 `dockerScripts/` 已挂载到 `/app/dockerScripts`，纯脚本更新通常只需要重建容器，无需重建镜像
 - 启动时至少包含：
   - `-p 3939:3939`
   - `-v /opt/pjsk-captures:/data`
@@ -199,3 +229,7 @@ python -m unittest discover -s tests -p "test_*.py" -v
   - `suite`
   - `mysekai`：
     - `/api/user/<uid>/mysekai?isForceAllReloadOnlyMysekai=True|False`
+
+## 图标覆盖规则
+- `mysekai_material` 与 `mysekai_item` 支持按 `iconAssetbundleName` 直接覆盖图标，例如 `item_plant_4.png`。
+- `mysekai_fixture` 支持简化命名，直接读取 `mysekai_fixture_<id>.png` 或 `fixture_<id>.png`。

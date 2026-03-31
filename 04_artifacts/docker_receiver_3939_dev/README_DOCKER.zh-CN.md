@@ -1,8 +1,6 @@
 # Mysekai/Suite Receiver Docker 指南（端口 3939）
 [English](./README_DOCKER.md) | [Project README](../../README.md) | [项目中文总览](../../README.zh-CN.md)
 
-运行脚本位于 `dockerScripts/`，构建镜像时会复制到容器内 `/app/dockerScripts`。
-
 ## 构建镜像
 
 ```bash
@@ -12,13 +10,13 @@ docker build -t pjsk-receiver:latest .
 ## 启动容器
 
 注意：
-- 当 `BOT_PUSH_URL` 为 `http://napcat:3000` 时，Receiver 与 NapCat 必须在同一个自定义 Docker 网络中。
-- 如果没有该网络，可先创建：`docker network create <YOUR_DOCKER_NETWORK>`。
+- Receiver 与 NapCat 必须在同一个 Docker 网络中：`docker network create <YOUR_DOCKER_NETWORK>`。
 - 文档中的 ID/Token 均为占位，请在实际部署时替换为你自己的参数。
+- 推荐把宿主机 `dockerScripts/` 挂载到容器 `/app/dockerScripts`；如果只是脚本更新，通常只需要重建容器，无需重建镜像。
 
 ```bash
 docker run -d \
-  --name pjsk-receiver \
+  --name pjsk-receiver-dev \
   --network <YOUR_DOCKER_NETWORK> \
   --restart=always \
   --log-driver=json-file \
@@ -44,26 +42,26 @@ docker run -d \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
-  -e MYSEKAI_ICON_SPREAD=22 \
-  -e SITE6_OFFSET_Z_DELTA=55 \ 
-  -e SITE6_OFFSET_X_DELTA=25 \ 
+  -e MYSEKAI_ICON_ENHANCE=1 \
+  -e MYSEKAI_ICON_SHARP_RADIUS=0.8 \
+  -e MYSEKAI_ICON_SHARP_PERCENT=130 \
+  -e MYSEKAI_ICON_SHARP_THRESHOLD=2 \
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
+  -v /opt/docker_receiver_3939_dev/dockerScripts:/app/dockerScripts \
   pjsk-receiver:latest
 ```
-
-说明：`SITE6_OFFSET_Z_DELTA=35` 为可选微调参数，用于当前部署中的 site6 查询渲染校准。
 
 启动后快速检查：
 
 ```bash
-docker logs -n 80 pjsk-receiver
-docker exec -it pjsk-receiver python -m pip show sssekai
-docker exec -it pjsk-receiver python -m sssekai -h
+docker logs -n 80 pjsk-receiver-dev
+docker exec -it pjsk-receiver-dev python -m pip show sssekai
+docker exec -it pjsk-receiver-dev python -m sssekai -h
 curl -sS http://127.0.0.1:3939/healthz
 ```
 
@@ -74,14 +72,14 @@ docker exec -it langbot python -c "import urllib.request;print(urllib.request.ur
 docker exec -it langbot python -c "import urllib.request;print(urllib.request.urlopen('http://pjsk-receiver-dev:3939/api/plugin/mysekai/map?mysekai_user_id=<YOUR_MYSEKAI_USER_ID>&requester_qq=123456',timeout=20).read().decode())"
 ```
 
-重建后渲染测试（site6）：
+渲染测试（通用单图）：
 
 ```bash
-docker exec -it pjsk-receiver-dev /bin/sh -lc 'SITE6_OFFSET_Z_DELTA=35 python /app/dockerScripts/render_mysekai_map.py \
+docker exec -it pjsk-receiver-dev /bin/sh -lc 'python /app/dockerScripts/render_mysekai_map.py \
   /data/decoded_api/mysekai/<YOUR_SOURCE_JSON>.json \
-  /data/decoded_api/mysekai/maps/plugin_api/site6_final_check.png \
+  /data/decoded_api/mysekai/maps/plugin_api/site_check.png \
   /app/dockerScripts/mysekai_assets \
-  --site-id 6 --target-size 1024'
+  --site-id <5|6|7|8> --target-size 1024'
 ```
 
 ## 容器内数据路径
@@ -90,24 +88,41 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'SITE6_OFFSET_Z_DELTA=35 python /a
 - 解密 json：`/data/decoded_api/suite` 或 `/data/decoded_api/mysekai`
 - Mysekai 渲染图：`/data/decoded_api/mysekai/maps`
 - 服务日志（滚动）：`/data/logs/receiver.log`
-- 钻石通知触发条件：解密后的完整 mysekai 包中出现 `mysekai_material:12`
-- 自动通知渲染触发条件：仅当前窗口首次命中 id=12 时触发（05:00-17:00、17:00-次日05:00）
-- 插件查询渲染触发条件：有可用全量 mysekai 包即可渲染
-- 渲染输出：按命中地图分别输出多张图，仅生成/发送命中地图
 - 渲染参数：
-  - `MYSEKAI_MAP_IMAGE_SIZE`：最终图片尺寸
+  - `MYSEKAI_MAP_IMAGE_SIZE`：输出目标宽度
   - `MYSEKAI_ICON_SIZE`：图标尺寸
   - `MYSEKAI_COUNT_FONT_SIZE`：数量文字尺寸
-  - `MYSEKAI_ICON_SPREAD`：同点多资源图标扩散半径
-  - 可选站点微调：
-    - `SITE<id>_OFFSET_X_DELTA`、`SITE<id>_OFFSET_Z_DELTA`
-    - `SITE<id>_SCALE_X_DELTA`、`SITE<id>_SCALE_Z_DELTA`
-- 钻石命中归档：`/data/notifications/hits/`
+  - 同点位普通材料条件忽略（内置）：
+    - 同点位出现 `id=2/3/4/5` 时隐藏 `mysekai_material id=1`
+    - 同点位出现 `id=7/8/9/10/11` 时隐藏 `mysekai_material id=6`
+  - 同点位重叠绘制规则：
+    - 主图标居中，数量角标在左上
+    - 其余图标右侧小列展示，不显示数量
+    - 小图标统一上层绘制，避免被大图标覆盖
+  - `material` 使用独立图标组，不再按 `mysekai_material` 解释
+  - `mysekai_music_record` 统一使用共享图标 `Extra_Record.png`
+  - 未映射的 `material`、未映射的 `mysekai_fixture` 会直接跳过，不再画占位点
+  - 额外图标可放到 `/app/dockerScripts/mysekai_assets/icon/`
+  - 直接识别的文件名：`material_<id>.png`、`mysekai_fixture_<id>.png`、`fixture_<id>.png`
+  - `SITE<id>_WORLD_HALF_X` / `SITE<id>_WORLD_HALF_Z`：站点固定世界尺度，控制世界坐标到地图坐标的稳定投影
+  - `SITE<id>_SCALE_X_DELTA` / `SITE<id>_SCALE_Z_DELTA`：站点级缩放微调
+  - `SITE<id>_OFFSET_X_DELTA` / `SITE<id>_OFFSET_Z_DELTA`：站点级偏移微调
+- 自动通知归档：`/data/notifications/hits/`
 - 通知事件日志：`/data/notifications/diamond_notifications.jsonl`
 - 健康检查接口：`GET /healthz`
 - 插件地图查询接口：`GET /api/plugin/mysekai/map`
 - 插件图片文件接口：`GET /api/plugin/mysekai/file?name=<file_name>`
 - `BOT_TOKEN` 为 NapCat HTTP Server Token（Bearer Token）
+
+## 通知与渲染规则
+
+- 自动通知只在检测到钻石命中时触发：`resourceType=mysekai_material` 且 `resourceId=12`
+- 去重窗口固定为本地时间 `05:00-17:00` 与 `17:00-次日05:00`
+- 同一用户在同一窗口内仅首次钻石命中会触发渲染与推送；同窗口内后续命中不会再次出图或推送
+- 默认推送模式为 `group`
+- 默认消息模式为 `text+image`
+- 若图片推送失败，会自动回退为纯文本推送
+- 插件主动查询与自动通知分离：插件查询只要存在可用全量 mysekai 包即可渲染，不要求钻石命中
 
 ## 插件查询 API
 
@@ -117,7 +132,7 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'SITE6_OFFSET_Z_DELTA=35 python /a
   - `requester_qq`（可选）
   - `site_id`（可选，取值 `5,6,7,8`，分别对应 `初始空地/心愿沙滩/烂漫花田/忘却之所`）
 - 成功响应格式：
-  - `{ "ok": true, "message": "ok", "data": { "text": "...", "images": ["http://..."] } }`
+  - `{ "ok": true, "message": "ok", "data": { "text": "...", "images": ["http://..."], "source_json": "..." } }`
   - 文本规则：
     - 全量查询（不带 `site_id`）返回空文本
     - 单图查询（带 `site_id`）仅显示中文地图名（例如：`地图：心愿沙滩`）
@@ -133,11 +148,6 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'SITE6_OFFSET_Z_DELTA=35 python /a
 - 图片消息段格式：
   - `{"type":"image","data":{"file":"<path|url|base64>"}}`
 
-## 宿主机路径映射示例
-
-若使用 `-v /opt/pjsk-captures:/data`，则服务端可在以下路径查看输出：
-
-- `/opt/pjsk-captures/raw_api/...`
-- `/opt/pjsk-captures/decoded_api/...`
-- `/opt/pjsk-captures/decoded_api/mysekai/maps/...`
-- `/opt/pjsk-captures/logs/receiver.log`
+## 图标命名规则
+- `mysekai_material` 与 `mysekai_item` 支持按 `iconAssetbundleName` 直接覆盖图标，例如 `item_plant_4.png`。
+- `mysekai_fixture` 支持简化命名，直接读取 `mysekai_fixture_<id>.png` 或 `fixture_<id>.png`。

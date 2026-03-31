@@ -26,6 +26,7 @@ AGENTS.md
 
 # Keep TODO local only.
 00_docs/TODO.md
+00_docs/MCP_SKILL_PLAN.md
 
 # Local reference repository (not part of project source).
 reference/
@@ -35,3 +36,4 @@ reference/
 tests/**/__pycache__/
 04_artifacts/**/__pycache__/
 04_artifacts/**/*.tar
+.gitnexus

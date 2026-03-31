@@ -1,7 +1,5 @@
-﻿# Mysekai/Suite Receiver Docker (Port 3939)
+# Mysekai/Suite Receiver Docker (Port 3939)
 [中文](./README_DOCKER.zh-CN.md) | [Project README](../../README.md) | [项目中文总览](../../README.zh-CN.md)
-
-Runtime scripts are stored in `dockerScripts/` and copied into the image as `/app/dockerScripts`.
 
 ## Build
 
@@ -11,14 +9,14 @@ docker build -t pjsk-receiver:latest .
 
 ## Run
 
-IMPORTANT:
-- Receiver and NapCat must be in the same user-defined Docker network when `BOT_PUSH_URL` points to `http://napcat:3000`.
-- Create one if needed: `docker network create <YOUR_DOCKER_NETWORK>`.
-- Keep IDs/tokens as placeholders in documentation; fill them only in your deployment environment.
+Notes:
+- Receiver and NapCat must be in the same Docker network: `docker network create <YOUR_DOCKER_NETWORK>`.
+- IDs and tokens below are placeholders. Replace them in your own environment.
+- Recommended: bind-mount host `dockerScripts/` to container `/app/dockerScripts`; for script-only updates, recreating the container is usually enough and rebuilding the image is unnecessary.
 
 ```bash
 docker run -d \
-  --name pjsk-receiver \
+  --name pjsk-receiver-dev \
   --network <YOUR_DOCKER_NETWORK> \
   --restart=always \
   --log-driver=json-file \
@@ -44,101 +42,112 @@ docker run -d \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
-  -e MYSEKAI_ICON_SPREAD=22 \
-  -e SITE6_OFFSET_Z_DELTA=55 \ 
-  -e SITE6_OFFSET_X_DELTA=25 \ 
+  -e MYSEKAI_ICON_ENHANCE=1 \
+  -e MYSEKAI_ICON_SHARP_RADIUS=0.8 \
+  -e MYSEKAI_ICON_SHARP_PERCENT=130 \
+  -e MYSEKAI_ICON_SHARP_THRESHOLD=2 \
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
+  -v /opt/docker_receiver_3939_dev/dockerScripts:/app/dockerScripts \
   pjsk-receiver:latest
 ```
-
-Note: `SITE6_OFFSET_Z_DELTA=35` is an optional tuning value used in current deployment to adjust site6 query rendering.
 
 Quick checks after start:
 
 ```bash
-docker logs -n 80 pjsk-receiver
-docker exec -it pjsk-receiver python -m pip show sssekai
-docker exec -it pjsk-receiver python -m sssekai -h
+docker logs -n 80 pjsk-receiver-dev
+docker exec -it pjsk-receiver-dev python -m pip show sssekai
+docker exec -it pjsk-receiver-dev python -m sssekai -h
 curl -sS http://127.0.0.1:3939/healthz
 ```
 
-Container-to-container connectivity check (from `langbot` container):
+Connectivity check from `langbot`:
 
 ```bash
 docker exec -it langbot python -c "import urllib.request;print(urllib.request.urlopen('http://pjsk-receiver-dev:3939/healthz',timeout=5).read().decode())"
 docker exec -it langbot python -c "import urllib.request;print(urllib.request.urlopen('http://pjsk-receiver-dev:3939/api/plugin/mysekai/map?mysekai_user_id=<YOUR_MYSEKAI_USER_ID>&requester_qq=123456',timeout=20).read().decode())"
 ```
 
-Post-rebuild rendering test (site6):
+Render test (generic single-site):
 
 ```bash
-docker exec -it pjsk-receiver-dev /bin/sh -lc 'SITE6_OFFSET_Z_DELTA=35 python /app/dockerScripts/render_mysekai_map.py \
+docker exec -it pjsk-receiver-dev /bin/sh -lc 'python /app/dockerScripts/render_mysekai_map.py \
   /data/decoded_api/mysekai/<YOUR_SOURCE_JSON>.json \
-  /data/decoded_api/mysekai/maps/plugin_api/site6_final_check.png \
+  /data/decoded_api/mysekai/maps/plugin_api/site_check.png \
   /app/dockerScripts/mysekai_assets \
-  --site-id 6 --target-size 1024'
+  --site-id <5|6|7|8> --target-size 1024'
 ```
 
-## Data paths in container
+## Container Paths
 
-- raw bin: /data/raw_api/suite or /data/raw_api/mysekai
-- decoded json: /data/decoded_api/suite or /data/decoded_api/mysekai
-- mysekai rendered maps: /data/decoded_api/mysekai/maps
-- service logs (rolling): /data/logs/receiver.log
-- diamond notification trigger: decoded mysekai full packet contains `mysekai_material:12`
-- automatic notification render trigger: only the first id=12 hit in current window can render/push (`05:00-17:00`, `17:00-next 05:00`)
-- plugin query render trigger: any available full mysekai packet can be rendered (not limited by diamond hit)
-- render output: one image per hit site; only hit sites are generated/sent
-- render tuning:
-  - `MYSEKAI_MAP_IMAGE_SIZE`: final output size
-  - `MYSEKAI_ICON_SIZE`: icon size on map
-  - `MYSEKAI_COUNT_FONT_SIZE`: quantity text size
-  - `MYSEKAI_ICON_SPREAD`: spread radius for multi-resource points
-  - optional per-site tuning:
-    - `SITE<id>_OFFSET_X_DELTA`, `SITE<id>_OFFSET_Z_DELTA`
-    - `SITE<id>_SCALE_X_DELTA`, `SITE<id>_SCALE_Z_DELTA`
-  - current default calibration lifts site 6 (beach) overlays by about 12.5% vertically
-- diamond hit archives: /data/notifications/hits/
-- diamond notification events: /data/notifications/diamond_notifications.jsonl
-- health check endpoint: GET /healthz
-- plugin map query endpoint: GET /api/plugin/mysekai/map
-- plugin image file endpoint: GET /api/plugin/mysekai/file?name=<file_name>
+- raw data: `/data/raw_api/...`
+- decoded json: `/data/decoded_api/...`
+- mysekai images: `/data/decoded_api/mysekai/maps/...`
+- logs: `/data/logs/receiver.log`
+- render settings:
+  - `MYSEKAI_MAP_IMAGE_SIZE`: output width
+  - `MYSEKAI_ICON_SIZE`: icon size
+  - `MYSEKAI_COUNT_FONT_SIZE`: count text size
+  - icon clarity enhancement (enabled by default):
+    - `MYSEKAI_ICON_ENHANCE` (`1/0`)
+    - `MYSEKAI_ICON_SHARP_RADIUS` (default `0.8`)
+    - `MYSEKAI_ICON_SHARP_PERCENT` (default `130`)
+    - `MYSEKAI_ICON_SHARP_THRESHOLD` (default `2`)
+  - same-coordinate conditional hide is built-in:
+    - hide `mysekai_material id=1` only when `id=2/3/4/5` exists at the same coordinate
+    - hide `mysekai_material id=6` only when `id=7/8/9/10/11` exists at the same coordinate
+  - overlap draw order:
+    - main icon stays centered and count badge is shown at top-left
+    - remaining icons are stacked in one small right-side column
+    - small/right-side icons are drawn in an upper layer and do not show count text
+  - `material` uses its own icon set and is no longer treated as `mysekai_material`
+  - `mysekai_music_record` uses the shared `Extra_Record.png` icon
+  - unmapped `material` and unmapped `mysekai_fixture` are skipped instead of drawing placeholder dots
+  - extra icons can be added under `/app/dockerScripts/mysekai_assets/icon/`
+  - direct filename pickup is supported for `material_<id>.png`, `mysekai_fixture_<id>.png`, and `fixture_<id>.png`
+  - `SITE<id>_WORLD_HALF_X` / `SITE<id>_WORLD_HALF_Z`: fixed per-site world span for stable projection from world coordinates to map coordinates
+  - `SITE<id>_SCALE_X_DELTA` / `SITE<id>_SCALE_Z_DELTA`: per-site scale fine-tuning
+  - `SITE<id>_OFFSET_X_DELTA` / `SITE<id>_OFFSET_Z_DELTA`: per-site offset fine-tuning
+- notification hits: `/data/notifications/hits/`
+- notification events: `/data/notifications/diamond_notifications.jsonl`
+- health endpoint: `GET /healthz`
+- plugin map query endpoint: `GET /api/plugin/mysekai/map`
+- plugin image file endpoint: `GET /api/plugin/mysekai/file?name=<file_name>`
 - `BOT_TOKEN` is the NapCat HTTP server token (Authorization Bearer token)
+
+## Notification And Render Rules
+
+- automatic notification triggers only on diamond hits: `resourceType=mysekai_material` and `resourceId=12`
+- dedup windows are fixed to local time `05:00-17:00` and `17:00-next 05:00`
+- for the same user, only the first diamond hit in one window can render and push; later hits in the same window are skipped
+- default push mode is `group`
+- default message mode is `text+image`
+- if image push fails, the receiver falls back to text push
+- plugin query rendering is separate from automatic notification: if a usable full mysekai packet exists, plugin query render can proceed without diamond hits
 
 ## Plugin Query API
 
-- Optional auth header: `X-API-Key` (enabled only when `PLUGIN_API_KEY` is set)
-- Query parameters:
-  - `mysekai_user_id` (required)
-  - `requester_qq` (optional)
-  - `site_id` (optional, one of `5,6,7,8`; labels: `初始空地/心愿沙滩/烂漫花田/忘却之所`)
-- Successful response format:
-  - `{ "ok": true, "message": "ok", "data": { "text": "...", "images": ["http://..."] } }`
-  - Text rule:
-    - full query (without `site_id`) returns empty text
-    - single-site query (with `site_id`) returns localized map name only (e.g. `地图：心愿沙滩`)
+- optional auth header: `X-API-Key`
+- query params:
+  - `mysekai_user_id`
+  - `requester_qq`
+  - `site_id` (`5,6,7,8`)
+- success response:
+  - `{ "ok": true, "message": "ok", "data": { "text": "...", "images": ["http://..."], "source_json": "..." } }`
+  - text policy:
+    - full query without `site_id`: empty text
+    - single-site query with `site_id`: localized Chinese site name only
 
-## NapCat API baseline (v4.17.48)
+## NapCat API Baseline
 
-For push implementation, use these action endpoints:
 - `POST {BOT_PUSH_URL}/send_private_msg`
 - `POST {BOT_PUSH_URL}/send_group_msg`
 
-Message body:
-- `message` can be plain string, or segment array
-- image segment:
-  - `{"type":"image","data":{"file":"<path|url|base64>"}}`
+## Icon File Naming
+- mysekai_material and mysekai_item support direct override files named after iconAssetbundleName, such as item_plant_4.png.
+- mysekai_fixture uses canonical local filenames such as mysekai_fixture_<id>.png or fixture_<id>.png.
 
-## Host mapped path example
-
-If you use `-v /opt/pjsk-captures:/data`, then on server:
-
-- /opt/pjsk-captures/raw_api/...
-- /opt/pjsk-captures/decoded_api/...
-- /opt/pjsk-captures/decoded_api/mysekai/maps/...
-- /opt/pjsk-captures/logs/receiver.log

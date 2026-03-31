@@ -1,4 +1,4 @@
-﻿# project-sekai
+# project-sekai
 [中文](./README.zh-CN.md) | [Docker English](./04_artifacts/docker_receiver_3939_dev/README_DOCKER.md) | [Docker 中文](./04_artifacts/docker_receiver_3939_dev/README_DOCKER.zh-CN.md)
 
 ## Overview
@@ -59,18 +59,24 @@ docker run -d \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
-  -e MYSEKAI_ICON_SPREAD=22 \
+  -e MYSEKAI_ICON_ENHANCE=1 \
+  -e MYSEKAI_ICON_SHARP_RADIUS=0.8 \
+  -e MYSEKAI_ICON_SHARP_PERCENT=130 \
+  -e MYSEKAI_ICON_SHARP_THRESHOLD=2 \
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
   -e TZ=Asia/Shanghai \
   -v /opt/pjsk-captures:/data \
   -v /opt/pjsk-config:/data/config \
+  -v /opt/docker_receiver_3939_dev/dockerScripts:/app/dockerScripts \
   pjsk-receiver:latest
 ```
 
 Optional:
-- place `mysekai_resource_map.json` in the proper config path to improve icon mapping accuracy
+- recommended: bind-mount host `dockerScripts/` to container `/app/dockerScripts` so script-only updates do not require rebuilding the image
+- when `dockerScripts/` is bind-mounted, script-only updates usually need only removing/recreating the container, not rebuilding the image
+- the code fallback and project deployment default both use `BOT_PUSH_MODE=group`
 
 Data output:
 - raw payloads: `/data/raw_api/...`
@@ -81,6 +87,56 @@ Data output:
 - notification events: `/data/notifications/diamond_notifications.jsonl`
 - automatic notification dedup/render rule: per user, only the first diamond hit in each window triggers render/push (`05:00-17:00` and `17:00-next 05:00`)
 - plugin query render rule: with an available full mysekai packet, map rendering is allowed even without diamond hits
+- renderer projection rule: fixed-origin mode is used (map center = world `(0,0)`); lock `SITE<id>_WORLD_HALF_X/Z` for stable cross-packet alignment
+- single-site render output now preserves the source map aspect ratio (`16:9`), and `MYSEKAI_MAP_IMAGE_SIZE` is treated as target output width
+- same-coordinate conditional hide is built-in:
+  - hide `mysekai_material id=1` only when `id=2/3/4/5` exists at the same coordinate
+  - hide `mysekai_material id=6` only when `id=7/8/9/10/11` exists at the same coordinate
+
+## Key Runtime Settings
+
+Push and notification:
+- `BOT_PUSH_MODE`: current code fallback is `group`, and project deployment also defaults to group push; set `private` explicitly if needed
+- `BOT_MESSAGE_MODE`: `text`, `image`, or `text+image`; current default strategy is `text+image`, and image push failure falls back to text
+- `BOT_PUSH_RETRY`: retry count for NapCat push
+- `NOTIFICATION_WINDOW_CACHE_HOURS`: retention for the in-memory/on-disk dedup gate cache
+- `NOTIFICATION_HIT_RETENTION`: how many raw notification hit json files to keep
+- `NOTIFICATION_EVENT_RETENTION_LINES`: max retained lines in `diamond_notifications.jsonl`
+- automatic notification trigger: only diamond hits (`mysekai_material`, `id=12`) can trigger render/push; for each user, only the first hit inside `05:00-17:00` or `17:00-next 05:00` is allowed through
+
+Plugin query:
+- `PLUGIN_API_KEY`: optional auth key checked via `X-API-Key`
+- `PLUGIN_QUERY_IMAGE_RETENTION`: retained query render image count
+- query text policy:
+  - full query without `site_id`: empty text
+  - single-site query with `site_id`: localized Chinese map name only
+- successful responses also include `source_json`, which shows which decoded mysekai file was actually used for the render
+
+Render sizing:
+- `MYSEKAI_MAP_IMAGE_SIZE`: target output width for single-site render
+- `MYSEKAI_ICON_SIZE`: icon size
+- `MYSEKAI_COUNT_FONT_SIZE`: count text size
+- icon clarity enhancement (enabled by default):
+  - `MYSEKAI_ICON_ENHANCE` (`1/0`)
+  - `MYSEKAI_ICON_SHARP_RADIUS` (default `0.8`)
+  - `MYSEKAI_ICON_SHARP_PERCENT` (default `130`)
+  - `MYSEKAI_ICON_SHARP_THRESHOLD` (default `2`)
+- overlap render rule:
+  - main icon stays centered and count badge is shown at top-left
+  - remaining icons are stacked in one small right-side column
+  - small/right-side icons are drawn in an upper layer and do not show count text
+- icon coverage:
+  - `material` uses its own icon set and is no longer treated as `mysekai_material`
+  - `mysekai_music_record` uses the shared `Extra_Record.png` icon
+  - unmapped `material` and unmapped `mysekai_fixture` are skipped instead of rendering placeholder dots
+  - extra icons can be dropped into `04_artifacts/docker_receiver_3939_dev/dockerScripts/mysekai_assets/icon/`
+  - file naming for direct pickup: `material_<id>.png`, `mysekai_fixture_<id>.png`, or `fixture_<id>.png`
+
+Per-site calibration:
+- `SITE<id>_WORLD_HALF_X` / `SITE<id>_WORLD_HALF_Z`: fixed world half-span used to project world coordinates into the map; this stabilizes cross-packet alignment
+- `SITE<id>_SCALE_X_DELTA` / `SITE<id>_SCALE_Z_DELTA`: fine-tune horizontal/vertical projection scale for one site
+- `SITE<id>_OFFSET_X_DELTA` / `SITE<id>_OFFSET_Z_DELTA`: fine-tune projected icon offset for one site
+- supported site ids: `5,6,7,8`
 
 ## Virtual Diamond Notification Test
 
@@ -123,25 +179,6 @@ Run from repository root:
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-## Auto Commit Task (Local)
-
-- Existing scripts:
-- `auto_commit.bat`
-- `auto_commit.ps1`
-- Logs:
-- `logs/auto_commit.log`
-- `logs/auto_commit_runner.log`
-- Network note:
-- script retries `git pull --rebase` and `git push` automatically when remote access is unstable.
-
-Current coverage scope:
-- API routing detection (`extract_api_type`)
-- Diamond extraction (`find_diamond_hits`, mixed payload cases)
-- Window boundary and dedup cache logic (`get_refresh_window_id`, `filter_hits_for_current_window`, `cleanup_window_dedup_cache`)
-- Notification push behavior (`send_bot_message`, `push_text_with_optional_image`, retry/fallback/mode branches)
-- Notification pipeline light integration (`process_mysekai_notification` skip/hit branches)
-- HTTP endpoints (`GET /healthz`, `GET /upload.js`, `GET /api/plugin/mysekai/map`, `GET /api/plugin/mysekai/file`, `GET /`)
-
 ## LangBot Placeholder Plugin (Upload Smoke Test)
 
 - Source directory: `04_artifacts/langbot_plugin_placeholder/MysekaiQueryPlaceholder`
@@ -164,8 +201,6 @@ Validated behavior (current):
 - `mysk bind <mysekai_user_id>` stores a per-QQ binding (`QQ user_id -> mysekai_user_id`)
 - `mysk map` queries the latest available full mysekai packet of the bound user
 - `mysk map site <id>` returns a single-site map (`id` in `5,6,7,8`)
-- query text uses localized site labels (`5=初始空地`, `7=烂漫花田`, `6=心愿沙滩`, `8=忘却之所`)
-- query text policy: full query returns empty text; single-site query returns localized map name only
 - unbound query returns: `not bound, use: mysk bind <mysekai_user_id>`
 - no data query returns: `map query failed: no full mysekai packet found for user`
 
@@ -181,6 +216,7 @@ Validated behavior (current):
 
 - Build image from `04_artifacts/docker_receiver_3939_dev`
 - Runtime code is copied from `dockerScripts/` to `/app/dockerScripts`
+- If host `dockerScripts/` is bind-mounted to `/app/dockerScripts`, script-only updates usually require only recreating the container, not rebuilding the image
 - Run with at least:
   - `-p 3939:3939`
   - `-v /opt/pjsk-captures:/data`
@@ -203,3 +239,7 @@ Validated behavior (current):
   - `suite`
   - `mysekai`:
     - `/api/user/<uid>/mysekai?isForceAllReloadOnlyMysekai=True|False`
+
+## Icon Overrides
+- mysekai_material and mysekai_item now prefer local override files named after iconAssetbundleName, for example item_plant_4.png, before falling back to the shared built-in icon mapping.
+- mysekai_fixture now uses canonical local filenames such as mysekai_fixture_<id>.png or fixture_<id>.png.
