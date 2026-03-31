@@ -4,7 +4,7 @@ import math
 import os
 from collections import OrderedDict
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 SUPPORTED_RESOURCE_TYPES = {
     "mysekai_material",
@@ -224,6 +224,17 @@ def _get_font(size):
         if os.path.isfile(p):
             return ImageFont.truetype(p, size)
     return ImageFont.load_default()
+
+
+def _enhance_icon_clarity(icon_img):
+    if not _env_bool("MYSEKAI_ICON_ENHANCE", True):
+        return icon_img
+    radius = max(0.1, _env_float("MYSEKAI_ICON_SHARP_RADIUS", 0.8))
+    percent = max(10, _env_int("MYSEKAI_ICON_SHARP_PERCENT", 130))
+    threshold = max(0, _env_int("MYSEKAI_ICON_SHARP_THRESHOLD", 2))
+    return icon_img.filter(
+        ImageFilter.UnsharpMask(radius=radius, percent=percent, threshold=threshold)
+    )
 
 
 def _transform(site_id, x, z):
@@ -518,6 +529,7 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
         icon = _get_icon(icon_dir, icons, key)
         if icon is not None:
             icon_img = icon.resize((icon_size, icon_size), Image.LANCZOS)
+            icon_img = _enhance_icon_clarity(icon_img)
             img.paste(
                 icon_img,
                 (center_x - icon_size // 2, center_y - icon_size // 2),
@@ -541,6 +553,7 @@ def _render_site(points_by_site, site_id, assets_dir, target_size):
         icon = _get_icon(icon_dir, icons, key)
         if icon is not None:
             icon_img = icon.resize((small_size, small_size), Image.LANCZOS)
+            icon_img = _enhance_icon_clarity(icon_img)
             img.paste(
                 icon_img,
                 (center_x - small_size // 2, center_y - small_size // 2),

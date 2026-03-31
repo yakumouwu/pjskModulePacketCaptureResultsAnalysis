@@ -59,6 +59,10 @@ docker run -d \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
+  -e MYSEKAI_ICON_ENHANCE=1 \
+  -e MYSEKAI_ICON_SHARP_RADIUS=0.8 \
+  -e MYSEKAI_ICON_SHARP_PERCENT=130 \
+  -e MYSEKAI_ICON_SHARP_THRESHOLD=2 \
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
@@ -112,6 +116,11 @@ Render sizing:
 - `MYSEKAI_MAP_IMAGE_SIZE`: target output width for single-site render
 - `MYSEKAI_ICON_SIZE`: icon size
 - `MYSEKAI_COUNT_FONT_SIZE`: count text size
+- icon clarity enhancement (enabled by default):
+  - `MYSEKAI_ICON_ENHANCE` (`1/0`)
+  - `MYSEKAI_ICON_SHARP_RADIUS` (default `0.8`)
+  - `MYSEKAI_ICON_SHARP_PERCENT` (default `130`)
+  - `MYSEKAI_ICON_SHARP_THRESHOLD` (default `2`)
 - overlap render rule:
   - main icon stays centered and count badge is shown at top-left
   - remaining icons are stacked in one small right-side column

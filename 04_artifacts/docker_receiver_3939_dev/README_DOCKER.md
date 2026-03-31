@@ -42,6 +42,10 @@ docker run -d \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
+  -e MYSEKAI_ICON_ENHANCE=1 \
+  -e MYSEKAI_ICON_SHARP_RADIUS=0.8 \
+  -e MYSEKAI_ICON_SHARP_PERCENT=130 \
+  -e MYSEKAI_ICON_SHARP_THRESHOLD=2 \
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
@@ -88,6 +92,11 @@ docker exec -it pjsk-receiver-dev /bin/sh -lc 'python /app/dockerScripts/render_
   - `MYSEKAI_MAP_IMAGE_SIZE`: output width
   - `MYSEKAI_ICON_SIZE`: icon size
   - `MYSEKAI_COUNT_FONT_SIZE`: count text size
+  - icon clarity enhancement (enabled by default):
+    - `MYSEKAI_ICON_ENHANCE` (`1/0`)
+    - `MYSEKAI_ICON_SHARP_RADIUS` (default `0.8`)
+    - `MYSEKAI_ICON_SHARP_PERCENT` (default `130`)
+    - `MYSEKAI_ICON_SHARP_THRESHOLD` (default `2`)
   - same-coordinate conditional hide is built-in:
     - hide `mysekai_material id=1` only when `id=2/3/4/5` exists at the same coordinate
     - hide `mysekai_material id=6` only when `id=7/8/9/10/11` exists at the same coordinate
