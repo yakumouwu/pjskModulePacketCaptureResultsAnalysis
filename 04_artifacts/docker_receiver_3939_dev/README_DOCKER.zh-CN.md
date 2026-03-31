@@ -16,7 +16,7 @@ docker build -t pjsk-receiver:latest .
 
 ```bash
 docker run -d \
-  --name pjsk-receiver \
+  --name pjsk-receiver-dev \
   --network <YOUR_DOCKER_NETWORK> \
   --restart=always \
   --log-driver=json-file \
@@ -42,6 +42,10 @@ docker run -d \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
+  -e MYSEKAI_ICON_ENHANCE=1 \
+  -e MYSEKAI_ICON_SHARP_RADIUS=0.8 \
+  -e MYSEKAI_ICON_SHARP_PERCENT=130 \
+  -e MYSEKAI_ICON_SHARP_THRESHOLD=2 \
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
@@ -55,9 +59,9 @@ docker run -d \
 启动后快速检查：
 
 ```bash
-docker logs -n 80 pjsk-receiver
-docker exec -it pjsk-receiver python -m pip show sssekai
-docker exec -it pjsk-receiver python -m sssekai -h
+docker logs -n 80 pjsk-receiver-dev
+docker exec -it pjsk-receiver-dev python -m pip show sssekai
+docker exec -it pjsk-receiver-dev python -m sssekai -h
 curl -sS http://127.0.0.1:3939/healthz
 ```
 

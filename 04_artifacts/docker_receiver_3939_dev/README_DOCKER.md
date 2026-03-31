@@ -16,7 +16,7 @@ Notes:
 
 ```bash
 docker run -d \
-  --name pjsk-receiver \
+  --name pjsk-receiver-dev \
   --network <YOUR_DOCKER_NETWORK> \
   --restart=always \
   --log-driver=json-file \
@@ -59,9 +59,9 @@ docker run -d \
 Quick checks after start:
 
 ```bash
-docker logs -n 80 pjsk-receiver
-docker exec -it pjsk-receiver python -m pip show sssekai
-docker exec -it pjsk-receiver python -m sssekai -h
+docker logs -n 80 pjsk-receiver-dev
+docker exec -it pjsk-receiver-dev python -m pip show sssekai
+docker exec -it pjsk-receiver-dev python -m sssekai -h
 curl -sS http://127.0.0.1:3939/healthz
 ```
 

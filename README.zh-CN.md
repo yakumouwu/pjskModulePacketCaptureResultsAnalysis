@@ -59,7 +59,10 @@ docker run -d \
   -e MYSEKAI_MAP_IMAGE_SIZE=1024 \
   -e MYSEKAI_ICON_SIZE=36 \
   -e MYSEKAI_COUNT_FONT_SIZE=18 \
-  -e MYSEKAI_ICON_SPREAD=22 \
+  -e MYSEKAI_ICON_ENHANCE=1 \
+  -e MYSEKAI_ICON_SHARP_RADIUS=0.8 \
+  -e MYSEKAI_ICON_SHARP_PERCENT=130 \
+  -e MYSEKAI_ICON_SHARP_THRESHOLD=2 \
   -e NOTIFICATION_WINDOW_CACHE_HOURS=72 \
   -e NOTIFICATION_HIT_RETENTION=100 \
   -e NOTIFICATION_EVENT_RETENTION_LINES=5000 \
@@ -84,7 +87,9 @@ docker run -d \
 - 插件查询渲染规则：只要存在可用全量 mysekai 包，即可渲染（不要求钻石命中）
 - 渲染投影规则：固定零点模式（地图中心 = 世界坐标 `(0,0)`），跨包一致性依赖固定世界尺度参数
 - 单图渲染默认保持底图原始比例（`16:9`），`MYSEKAI_MAP_IMAGE_SIZE` 表示输出目标宽度
-- 同点位普通材料忽略（默认开启）：`MYSEKAI_IGNORE_BASE_MATERIALS=1`
+- 同点位普通材料条件忽略（内置规则）：
+  - 同点位出现 `id=2/3/4/5` 时隐藏 `mysekai_material id=1`
+  - 同点位出现 `id=7/8/9/10/11` 时隐藏 `mysekai_material id=6`
 
 ## 关键运行参数
 
@@ -109,8 +114,15 @@ docker run -d \
 - `MYSEKAI_MAP_IMAGE_SIZE`：单图渲染输出目标宽度
 - `MYSEKAI_ICON_SIZE`：图标尺寸
 - `MYSEKAI_COUNT_FONT_SIZE`：数量文字尺寸
-- `MYSEKAI_ICON_SPREAD`：同点多资源图标扩散半径
-- `MYSEKAI_IGNORE_BASE_MATERIALS=1`：同点位存在高阶材料时隐藏普通材料
+- 图标清晰度增强（默认开启）：
+  - `MYSEKAI_ICON_ENHANCE`（`1/0`）
+  - `MYSEKAI_ICON_SHARP_RADIUS`（默认 `0.8`）
+  - `MYSEKAI_ICON_SHARP_PERCENT`（默认 `130`）
+  - `MYSEKAI_ICON_SHARP_THRESHOLD`（默认 `2`）
+- 同点位重叠渲染规则：
+  - 主图标居中，数量角标在左上
+  - 其余图标右侧小列展示，不显示数量
+  - 小图标统一上层绘制，避免被大图标覆盖
 - 图标覆盖补充：
   - `material` 使用独立图标组，不再按 `mysekai_material` 解释
   - `mysekai_music_record` 统一使用共享图标 `Extra_Record.png`
