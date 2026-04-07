@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 import json
 import math
 import os
@@ -50,8 +50,8 @@ SITE_CONFIG = {
         "bg": "beach.png",
         "transform": "x_negz",
         "world_bounds": (-30.0, 29.0, -20.0, 68.0),
-        "scale_add": (16.6, 16.2),
-        "offset_add": (20.0, 120.0),
+        "scale_add": (16.6, 14.5),
+        "offset_add": (20.0, 106.0),
     },
     7: {
         "name": "Map 3",
