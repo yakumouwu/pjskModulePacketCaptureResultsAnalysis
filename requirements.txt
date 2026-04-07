@@ -1,0 +1,10 @@
+# Project Sekai API Data Capture System - Python Dependencies
+# Core dependencies
+sssekai==0.7.62
+Pillow>=9.0.0
+
+# Development dependencies (optional, install with: pip install -r requirements.txt -r requirements-dev.txt)
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
+# black>=23.0.0
+# flake8>=6.0.0

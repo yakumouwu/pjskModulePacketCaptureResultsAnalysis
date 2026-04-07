@@ -6,6 +6,8 @@
 !README.md
 !README.zh-CN.md
 !batchAnalysis.bat
+!requirements.txt
+!.env.example
 AGENTS.md
 
 # Keep workflow files only.
